@@ -49,6 +49,7 @@ endif()
 # ---- oe3dmol_core ----
 add_library(oe3dmol_core
     src/version.cpp
+    src/color_schemes.cpp
 )
 set_target_properties(oe3dmol_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(oe3dmol_core
