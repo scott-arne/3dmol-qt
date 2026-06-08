@@ -52,6 +52,7 @@ add_library(oe3dmol_core
     src/color_schemes.cpp
     src/vdw_radii.cpp
     src/style.cpp
+    src/bounding_box.cpp
 )
 set_target_properties(oe3dmol_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(oe3dmol_core
