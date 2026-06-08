@@ -1,0 +1,35 @@
+#pragma once
+
+/// \file mesh_buffer.h
+/// \brief CPU-side interleaved vertex/index buffer (no GPU types).
+
+#include <cstdint>
+#include <vector>
+
+namespace oe3dmol {
+
+/// \brief Interleaved vertex layout for sphere imposters.
+///
+/// Per vertex: position(xyz) + normal(xyz, encodes corner offset) + color(rgb)
+/// = 9 floats. Matches the attributes consumed by sphereimposter.vert.
+struct VertexLayout {
+    static constexpr int FLOATS_PER_VERTEX = 9;
+    static constexpr int POSITION_OFFSET = 0;  ///< floats
+    static constexpr int NORMAL_OFFSET = 3;    ///< floats
+    static constexpr int COLOR_OFFSET = 6;     ///< floats
+};
+
+/// \brief CPU vertex + index data ready for GPU upload.
+struct MeshBuffer {
+    std::vector<float> vertices;     ///< Interleaved, FLOATS_PER_VERTEX per vertex.
+    std::vector<std::uint32_t> indices;  ///< Triangle indices.
+
+    /// \brief Number of vertices.
+    std::size_t vertex_count() const {
+        return vertices.size() / VertexLayout::FLOATS_PER_VERTEX;
+    }
+    /// \brief Number of indices.
+    std::size_t index_count() const { return indices.size(); }
+};
+
+}  // namespace oe3dmol
