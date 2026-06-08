@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/shaders">
+        <file>sphereimposter.vert.qsb</file>
+        <file>sphereimposter.frag.qsb</file>
+    </qresource>
+</RCC>
