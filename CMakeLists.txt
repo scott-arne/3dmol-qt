@@ -46,6 +46,18 @@ endif()
 
 # Targets are added by subsequent tasks.
 
+# ---- oe3dmol_core ----
+add_library(oe3dmol_core
+    src/version.cpp
+)
+set_target_properties(oe3dmol_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(oe3dmol_core
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(oe3dmol_core PUBLIC Qt6::Core Qt6::Gui)
+
 if(OE3DMOL_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
