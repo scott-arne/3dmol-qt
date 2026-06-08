@@ -39,7 +39,7 @@ list(APPEND CMAKE_MODULE_PATH "${cmake_openeye_SOURCE_DIR}")
 find_package(OpenEye REQUIRED)
 
 # Qt6 (Core + Gui everywhere; GuiPrivate only used by the render target)
-find_package(Qt6 REQUIRED COMPONENTS Core Gui)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui GuiPrivate)
 if(Qt6_VERSION VERSION_LESS 6.6)
     message(FATAL_ERROR "Qt 6.6+ is required for a stable QRhi API (found ${Qt6_VERSION}).")
 endif()
@@ -91,6 +91,38 @@ target_link_libraries(oe3dmol_data
         OpenEye::OEChem
         OpenEye::OEGrid
         OpenEye::OESystem
+)
+
+# ---- oe3dmol_render ----
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/compile_shaders.cmake)
+oe3dmol_compile_shaders(OE3DMOL_SHADER_QSB
+    shaders/sphereimposter.vert
+    shaders/sphereimposter.frag
+)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/shaders.qrc
+    ${CMAKE_CURRENT_BINARY_DIR}/shaders.qrc COPYONLY)
+qt_add_resources(OE3DMOL_SHADER_RES
+    ${CMAKE_CURRENT_BINARY_DIR}/shaders.qrc)
+
+add_library(oe3dmol_render
+    src/rhi_context.cpp
+    ${OE3DMOL_SHADER_QSB}
+    ${OE3DMOL_SHADER_RES}
+)
+set_target_properties(oe3dmol_render PROPERTIES POSITION_INDEPENDENT_CODE ON AUTORCC OFF)
+target_include_directories(oe3dmol_render
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(oe3dmol_render
+    PUBLIC
+        oe3dmol_core
+        oe3dmol_geometry
+        oe3dmol_data
+        Qt6::Gui
+        Qt6::GuiPrivate
 )
 
 if(OE3DMOL_BUILD_TESTS)
