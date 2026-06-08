@@ -1,0 +1,33 @@
+# Build artifacts
+build*/
+cmake-build-*/
+dist/
+.cache
+
+# CMake
+CMakeFiles/
+cmake_install.cmake
+CMakeCache.txt
+compile_commands.json
+CMakeUserPresets.json
+
+# Compiled
+*.so
+*.dylib
+*.a
+*.lib
+*.qsb
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# OpenEye
+oe_license.txt
+
+# Claude
+docs/superpowers
+docs/plans
