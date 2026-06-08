@@ -41,15 +41,4 @@ AtomData build_atom_data(const OEChem::OEMolBase* mol, const SphereStyle& style)
     return data;
 }
 
-AtomData build_atom_data_from_graphmol(const OEChem::OEGraphMol* mol,
-                                       const SphereStyle& style) {
-    if (mol == nullptr) {
-        throw DataError("build_atom_data: molecule is null");
-    }
-    // OEGraphMol does not derive from OEMolBase; it exposes the underlying
-    // interface object through an implicit conversion operator.
-    const OEChem::OEMolBase& base = *mol;
-    return build_atom_data(&base, style);
-}
-
 }  // namespace oe3dmol

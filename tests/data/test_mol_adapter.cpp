@@ -8,6 +8,16 @@
 namespace oe3dmol {
 namespace test {
 
+namespace {
+// OEGraphMol does not derive from OEMolBase; it converts implicitly to
+// OEMolBase&. Real callers hold an OEMolBase*, so the tests acquire one the
+// same way before calling build_atom_data.
+const OEChem::OEMolBase* as_base(const OEChem::OEGraphMol& mol) {
+    const OEChem::OEMolBase& base = mol;
+    return &base;
+}
+}  // namespace
+
 TEST(MolAdapterTest, NullMoleculeThrows) {
     SphereStyle style;
     EXPECT_THROW(build_atom_data(nullptr, style), DataError);
@@ -16,7 +26,7 @@ TEST(MolAdapterTest, NullMoleculeThrows) {
 TEST(MolAdapterTest, EmptyMoleculeThrows) {
     OEChem::OEGraphMol mol;
     SphereStyle style;
-    EXPECT_THROW(build_atom_data(&mol, style), DataError);
+    EXPECT_THROW(build_atom_data(as_base(mol), style), DataError);
 }
 
 TEST(MolAdapterTest, SingleCarbonHasOneAtomVdwRadius) {
@@ -26,7 +36,7 @@ TEST(MolAdapterTest, SingleCarbonHasOneAtomVdwRadius) {
     mol.SetCoords(a, coords);
 
     SphereStyle style;  // Jmol, no explicit radius/scale
-    AtomData data = build_atom_data(&mol, style);
+    AtomData data = build_atom_data(as_base(mol), style);
 
     ASSERT_EQ(data.size(), 1u);
     EXPECT_FLOAT_EQ(data.positions[0].x(), 1.0f);
@@ -42,7 +52,7 @@ TEST(MolAdapterTest, CarbonGetsJmolGreyColor) {
     mol.SetCoords(a, coords);
 
     SphereStyle style;
-    AtomData data = build_atom_data(&mol, style);
+    AtomData data = build_atom_data(as_base(mol), style);
 
     ASSERT_EQ(data.size(), 1u);
     EXPECT_EQ(data.colors[0].red(), 0x90);
@@ -60,7 +70,7 @@ TEST(MolAdapterTest, BoundsCoverAllAtoms) {
     mol.SetCoords(b, cb);
 
     SphereStyle style;
-    AtomData data = build_atom_data(&mol, style);
+    AtomData data = build_atom_data(as_base(mol), style);
 
     ASSERT_EQ(data.size(), 2u);
     EXPECT_TRUE(data.bounds.valid());
