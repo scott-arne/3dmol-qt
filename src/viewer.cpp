@@ -59,16 +59,29 @@ QImage Viewer::render() {
             if (std::holds_alternative<SphereStyle>(spec)) {
                 AtomData d = build_atom_data(m.mol, std::get<SphereStyle>(spec));
                 for (std::size_t i = 0; i < d.size(); ++i) {
-                    atoms.add(d.positions[i], d.radii[i], d.colors[i], d.source_idx[i]);
                     scene_bounds.include(d.positions[i], d.radii[i]);
+                }
+                if (atoms.size() == 0) {
+                    atoms = std::move(d);
+                } else {
+                    for (std::size_t i = 0; i < d.size(); ++i) {
+                        atoms.add(d.positions[i], d.radii[i], d.colors[i],
+                                  d.source_idx[i]);
+                    }
                 }
             } else {
                 BondData b = build_bond_data(m.mol, std::get<StickStyle>(spec));
                 for (std::size_t i = 0; i < b.size(); ++i) {
-                    bonds.add(b.starts[i], b.ends[i], b.radii[i], b.colors[i],
-                              b.source_bond_idx[i]);
                     scene_bounds.include(b.starts[i], b.radii[i]);
                     scene_bounds.include(b.ends[i], b.radii[i]);
+                }
+                if (bonds.size() == 0) {
+                    bonds = std::move(b);
+                } else {
+                    for (std::size_t i = 0; i < b.size(); ++i) {
+                        bonds.add(b.starts[i], b.ends[i], b.radii[i], b.colors[i],
+                                  b.source_bond_idx[i]);
+                    }
                 }
             }
         }

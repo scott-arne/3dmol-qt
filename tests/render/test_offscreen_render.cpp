@@ -265,5 +265,58 @@ TEST(ViewerCompositionTest, BallAndStickDrawsBothSphereAndStick) {
     EXPECT_TRUE(red_right);
 }
 
+TEST(ViewerCompositionTest, StickOnlyDrawsSticksNoSpheresPath) {
+    // A stick-only style exercises the has_spheres==false branch of render().
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* a = mol.NewAtom(6);
+    OEChem::OEAtomBase* o = mol.NewAtom(8);
+    double ca[3] = {-0.7, 0, 0};
+    double co[3] = {0.7, 0, 0};
+    mol.SetCoords(a, ca);
+    mol.SetCoords(o, co);
+    mol.NewBond(a, o, 1);
+    const OEChem::OEMolBase& base = mol;
+
+    Viewer viewer(160, 160);
+    viewer.set_background_color(QColor(0, 0, 0));
+    int idx = viewer.add_model(&base);
+    viewer.set_style(idx, std::vector<StyleSpec>{StickStyle{}});
+    QImage img = viewer.render();
+
+    ASSERT_FALSE(img.isNull());
+    int nonblack = 0;
+    for (int y = 0; y < img.height(); y += 4)
+        for (int x = 0; x < img.width(); x += 4) {
+            QColor c = img.pixelColor(x, y);
+            if (c.red() > 20 || c.green() > 20 || c.blue() > 20) ++nonblack;
+        }
+    EXPECT_GT(nonblack, 10);  // sticks rendered
+}
+
+TEST(ViewerCompositionTest, Sp1SphereStyleOverloadStillRenders) {
+    // Regression: the single-SphereStyle overload (delegating to the vector form)
+    // must still render after the multi-style refactor.
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* a = mol.NewAtom(6);
+    double ca[3] = {0, 0, 0};
+    mol.SetCoords(a, ca);
+    const OEChem::OEMolBase& base = mol;
+
+    Viewer viewer(160, 160);
+    viewer.set_background_color(QColor(0, 0, 0));
+    int idx = viewer.add_model(&base);
+    viewer.set_style(idx, SphereStyle{});  // SP1 overload
+    QImage img = viewer.render();
+
+    ASSERT_FALSE(img.isNull());
+    int nonblack = 0;
+    for (int y = 0; y < img.height(); y += 4)
+        for (int x = 0; x < img.width(); x += 4) {
+            QColor c = img.pixelColor(x, y);
+            if (c.red() > 20 || c.green() > 20 || c.blue() > 20) ++nonblack;
+        }
+    EXPECT_GT(nonblack, 10);  // sphere rendered via SP1 overload
+}
+
 }  // namespace test
 }  // namespace oe3dmol
