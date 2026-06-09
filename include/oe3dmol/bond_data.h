@@ -28,6 +28,15 @@ struct BondData {
     /// \brief Number of half-bonds held.
     std::size_t size() const { return starts.size(); }
 
+    /// \brief Reserve capacity for `n` half-bonds across all arrays.
+    void reserve(std::size_t n) {
+        starts.reserve(n);
+        ends.reserve(n);
+        radii.reserve(n);
+        colors.reserve(n);
+        source_bond_idx.reserve(n);
+    }
+
     /// \brief Append one half-bond and grow the bounding box (endpoints, no radius).
     void add(const QVector3D& start, const QVector3D& end, float radius,
              const Color& color, unsigned bond_index) {
