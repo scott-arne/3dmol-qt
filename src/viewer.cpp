@@ -69,7 +69,7 @@ QImage Viewer::render() {
                                   d.source_idx[i]);
                     }
                 }
-            } else {
+            } else if (std::holds_alternative<StickStyle>(spec)) {
                 BondData b = build_bond_data(m.mol, std::get<StickStyle>(spec));
                 for (std::size_t i = 0; i < b.size(); ++i) {
                     scene_bounds.include(b.starts[i], b.radii[i]);
