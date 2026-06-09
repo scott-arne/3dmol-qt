@@ -9,11 +9,15 @@
 #include "oe3dmol/cylinder_builder.h"
 #include "oe3dmol/bond_data.h"
 #include "oe3dmol/viewer.h"
+#include "oe3dmol/scene_renderer.h"
+#include "oe3dmol/mol_adapter.h"
+#include "oe3dmol/bond_adapter.h"
 
 #include <oechem.h>
 
 #include <QGuiApplication>
 #include <QImage>
+#include <QQuaternion>
 
 #include <rhi/qrhi.h>
 
@@ -316,6 +320,63 @@ TEST(ViewerCompositionTest, Sp1SphereStyleOverloadStillRenders) {
             if (c.red() > 20 || c.green() > 20 || c.blue() > 20) ++nonblack;
         }
     EXPECT_GT(nonblack, 10);  // sphere rendered via SP1 overload
+}
+
+TEST(SceneRendererTest, RendersSphereSceneNonEmpty) {
+    const QSize sz(128, 128);
+    RhiContext ctx(sz);
+
+    AtomData atoms;
+    atoms.add(QVector3D(0, 0, 0), 1.0f, Color(255, 0, 0), 0u);
+    BondData bonds;  // empty
+
+    SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+    renderer.set_geometry(atoms, bonds);
+
+    Camera cam;
+    cam.zoom_to(atoms.bounds);
+
+    QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+        renderer.draw(cb, cam, sz);
+    });
+    ASSERT_FALSE(img.isNull());
+    QColor center = img.pixelColor(64, 64);
+    EXPECT_GT(center.red(), 60);
+}
+
+TEST(SceneRendererTest, OrbitChangesRenderedImage) {
+    const QSize sz(128, 128);
+
+    AtomData atoms;
+    atoms.add(QVector3D(-1.5f, 0, 0), 0.6f, Color(255, 0, 0), 0u);   // red left
+    atoms.add(QVector3D(1.5f, 0, 0), 0.6f, Color(0, 0, 255), 1u);    // blue right
+    BondData bonds;
+
+    auto render_with = [&](const Camera& cam) {
+        RhiContext ctx(sz);
+        SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+        renderer.set_geometry(atoms, bonds);
+        return ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+            renderer.draw(cb, cam, sz);
+        });
+    };
+
+    Camera cam0;
+    cam0.zoom_to(atoms.bounds);
+    QImage img0 = render_with(cam0);
+
+    Camera cam1;
+    cam1.zoom_to(atoms.bounds);
+    cam1.orbit(QQuaternion::fromAxisAndAngle(QVector3D(0, 1, 0), 90.0f));
+    QImage img1 = render_with(cam1);
+
+    ASSERT_FALSE(img0.isNull());
+    ASSERT_FALSE(img1.isNull());
+    int diff = 0;
+    for (int y = 0; y < sz.height(); y += 4)
+        for (int x = 0; x < sz.width(); x += 4)
+            if (img0.pixelColor(x, y) != img1.pixelColor(x, y)) ++diff;
+    EXPECT_GT(diff, 5);
 }
 
 }  // namespace test
