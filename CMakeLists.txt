@@ -66,6 +66,7 @@ target_link_libraries(oe3dmol_core PUBLIC Qt6::Core Qt6::Gui)
 # ---- oe3dmol_geometry ----
 add_library(oe3dmol_geometry
     src/sphere_imposter_builder.cpp
+    src/cylinder_builder.cpp
 )
 set_target_properties(oe3dmol_geometry PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(oe3dmol_geometry
