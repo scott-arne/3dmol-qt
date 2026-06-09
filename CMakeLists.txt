@@ -39,7 +39,7 @@ list(APPEND CMAKE_MODULE_PATH "${cmake_openeye_SOURCE_DIR}")
 find_package(OpenEye REQUIRED)
 
 # Qt6 (Core + Gui everywhere; GuiPrivate only used by the render target)
-find_package(Qt6 REQUIRED COMPONENTS Core Gui GuiPrivate)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui GuiPrivate Widgets)
 if(Qt6_VERSION VERSION_LESS 6.6)
     message(FATAL_ERROR "Qt 6.6+ is required for a stable QRhi API (found ${Qt6_VERSION}).")
 endif()
@@ -131,6 +131,25 @@ target_link_libraries(oe3dmol_render
         oe3dmol_geometry
         oe3dmol_data
         Qt6::Gui
+        Qt6::GuiPrivate
+)
+
+# ---- oe3dmol_widget (interactive QRhiWidget; the only QtWidgets consumer) ----
+add_library(oe3dmol_widget
+    src/molecule_viewer_widget.cpp
+)
+set_target_properties(oe3dmol_widget PROPERTIES POSITION_INDEPENDENT_CODE ON AUTOMOC ON)
+target_include_directories(oe3dmol_widget
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(oe3dmol_widget
+    PUBLIC
+        oe3dmol_core
+        oe3dmol_render
+        oe3dmol_data
+        Qt6::Widgets
         Qt6::GuiPrivate
 )
 
