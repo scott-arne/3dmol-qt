@@ -71,5 +71,14 @@ TEST(CylinderBuilderTest, EmptyBondsProduceEmptyInstances) {
     EXPECT_TRUE(inst.empty());
 }
 
+TEST(CylinderBuilderTest, ExactVertexAndIndexCountFor16Segments) {
+    MeshBuffer m = build_unit_cylinder(16);
+    constexpr int S = CylinderVertexLayout::FLOATS_PER_VERTEX;
+    // 2 side rings (32) + bottom cap (1 center + 16 rim) + top cap (17) = 66.
+    EXPECT_EQ(m.vertices.size(), static_cast<std::size_t>(66 * S));
+    // side 6*16 + bottom 3*16 + top 3*16 = 192.
+    EXPECT_EQ(m.indices.size(), 192u);
+}
+
 }  // namespace test
 }  // namespace oe3dmol

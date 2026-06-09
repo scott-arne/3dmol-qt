@@ -25,7 +25,11 @@ struct MeshBuffer {
     std::vector<float> vertices;     ///< Interleaved, FLOATS_PER_VERTEX per vertex.
     std::vector<std::uint32_t> indices;  ///< Triangle indices.
 
-    /// \brief Number of vertices.
+    /// \brief Number of vertices, assuming the sphere VertexLayout (10 floats).
+    ///
+    /// \note Valid only for sphere-imposter meshes. Meshes built with a
+    ///       different layout (e.g. the 6-float cylinder mesh) must compute
+    ///       their vertex count using their own layout stride, not this method.
     std::size_t vertex_count() const {
         return vertices.size() / VertexLayout::FLOATS_PER_VERTEX;
     }
