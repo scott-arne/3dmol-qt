@@ -5,6 +5,8 @@
 
 #include <oechem.h>
 
+#include <algorithm>
+
 namespace oe3dmol {
 
 AtomData build_atom_data(const OEChem::OEMolBase* mol, const SphereStyle& style) {
@@ -30,7 +32,9 @@ AtomData build_atom_data(const OEChem::OEMolBase* mol, const SphereStyle& style)
         const std::string element = OEChem::OEGetAtomicSymbol(atomic_num);
 
         const float radius = static_cast<float>(resolve_radius(style, element));
-        const Color color = element_color(style.color(), element);
+        Color color = element_color(style.color(), element);
+        const double op = std::clamp(style.opacity(), 0.0, 1.0);
+        color.setAlphaF(static_cast<float>(op));
 
         data.add(QVector3D(static_cast<float>(coords[0]),
                            static_cast<float>(coords[1]),

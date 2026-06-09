@@ -58,6 +58,22 @@ TEST(SphereImposterBuilderTest, ColorsNormalizedToUnitFloat) {
     EXPECT_FLOAT_EQ(m.vertices[C + 0], 1.0f);  // red 255/255
     EXPECT_FLOAT_EQ(m.vertices[C + 1], 0.0f);
     EXPECT_FLOAT_EQ(m.vertices[C + 2], 0.0f);
+    EXPECT_FLOAT_EQ(m.vertices[C + 3], 1.0f);  // opaque alpha
+}
+
+TEST(SphereImposterBuilderTest, AlphaCarriedPerVertex) {
+    AtomData d;
+    Color c(0, 255, 0);
+    c.setAlphaF(0.5f);
+    d.add(QVector3D(0, 0, 0), 1.0f, c, 0u);
+    MeshBuffer m = build_sphere_imposters(d);
+    constexpr int S = VertexLayout::FLOATS_PER_VERTEX;
+    constexpr int C = VertexLayout::COLOR_OFFSET;
+    for (int v = 0; v < 4; ++v) {
+        // QColor stores alpha as 8-bit, so 0.5f round-trips to ~0.500008;
+        // tolerate one quantization step (1/255).
+        EXPECT_NEAR(m.vertices[v * S + C + 3], 0.5f, 1.0f / 255.0f);
+    }
 }
 
 TEST(SphereImposterBuilderTest, FaceWindingMatches3dmol) {

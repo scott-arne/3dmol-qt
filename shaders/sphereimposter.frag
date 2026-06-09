@@ -14,7 +14,7 @@ layout(std140, binding = 0) uniform Ubo {
 } ubo;
 
 layout(location = 0) in vec2 mapping;
-layout(location = 1) in vec3 vColor;
+layout(location = 1) in vec4 vColor;
 layout(location = 2) in float rval;
 layout(location = 3) in vec3 vLight;
 layout(location = 4) in vec3 vCenter;
@@ -38,9 +38,9 @@ void main() {
     float dotProduct = dot(norm, vLight);
     vec3 directionalLightWeighting = vec3(max(dotProduct, 0.0));
     vec3 lightWeight = ubo.directionalLightColor.xyz * directionalLightWeighting;
-    vec3 col = lightWeight * vColor;
+    vec3 col = lightWeight * vColor.rgb;
 
-    fragColor = vec4(col, ubo.opacity * ubo.opacity);
+    fragColor = vec4(col, vColor.a * vColor.a);
 
     if (ubo.fogNear != ubo.fogFar) {
         float depth = -cameraPos.z;

@@ -79,5 +79,40 @@ TEST(SphereImposterPipelineTest, DrawsRedSphereAtCenter) {
     EXPECT_LT(corner.red(), 20);
 }
 
+TEST(SphereImposterPipelineTest, OpacityDarkensOverBlackBackground) {
+    const QSize sz(128, 128);
+    auto render_alpha = [&](float alpha) -> QColor {
+        RhiContext ctx(sz);
+        AtomData atoms;
+        Color red(255, 0, 0);
+        red.setAlphaF(alpha);
+        atoms.add(QVector3D(0, 0, 0), 1.0f, red, 0u);
+        MeshBuffer mesh = build_sphere_imposters(atoms);
+        Camera cam;
+        cam.zoom_to(atoms.bounds);
+        SphereImposterPipeline pipeline(ctx.rhi(), ctx.render_pass_descriptor());
+        ImposterUniforms u;
+        u.view = cam.view_matrix();
+        u.projection = cam.projection_matrix(1.0f);
+        u.model_view = u.view;
+        QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+            QRhiResourceUpdateBatch* b = ctx.rhi()->nextResourceUpdateBatch();
+            pipeline.upload(mesh, b);
+            pipeline.set_uniforms(u, b);
+            cb->resourceUpdate(b);
+            pipeline.draw(cb, sz);
+        });
+        return img.pixelColor(64, 64);
+    };
+    QColor opaque = render_alpha(1.0f);
+    QColor semi = render_alpha(0.5f);
+    // Opaque center is bright red.
+    EXPECT_GT(opaque.red(), 150);
+    // Semi-transparent center over black is materially dimmer (alpha^2=0.25 of opaque)...
+    EXPECT_LT(semi.red(), opaque.red() - 30);
+    // ...but still clearly rendered (not background black).
+    EXPECT_GT(semi.red(), 10);
+}
+
 }  // namespace test
 }  // namespace oe3dmol

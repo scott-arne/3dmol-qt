@@ -10,13 +10,14 @@ namespace oe3dmol {
 
 /// \brief Interleaved vertex layout for sphere imposters.
 ///
-/// Per vertex: position(xyz) + normal(xyz, encodes corner offset) + color(rgb)
-/// = 9 floats. Matches the attributes consumed by sphereimposter.vert.
+/// Per vertex: position(xyz) + normal(xyz, encodes corner offset) + color(rgba)
+/// = 10 floats. Matches the attributes consumed by sphereimposter.vert. The
+/// color alpha carries per-atom opacity.
 struct VertexLayout {
-    static constexpr int FLOATS_PER_VERTEX = 9;
+    static constexpr int FLOATS_PER_VERTEX = 10;
     static constexpr int POSITION_OFFSET = 0;  ///< floats
     static constexpr int NORMAL_OFFSET = 3;    ///< floats
-    static constexpr int COLOR_OFFSET = 6;     ///< floats
+    static constexpr int COLOR_OFFSET = 6;     ///< floats (rgba, 4 floats)
 };
 
 /// \brief CPU vertex + index data ready for GPU upload.

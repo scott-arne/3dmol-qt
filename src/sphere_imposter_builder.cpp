@@ -17,6 +17,7 @@ MeshBuffer build_sphere_imposters(const AtomData& atoms) {
         const float cr = static_cast<float>(col.redF());
         const float cg = static_cast<float>(col.greenF());
         const float cb = static_cast<float>(col.blueF());
+        const float ca = static_cast<float>(col.alphaF());
 
         const float corner[4][2] = {
             {-r,  r},
@@ -37,6 +38,7 @@ MeshBuffer build_sphere_imposters(const AtomData& atoms) {
             p[VertexLayout::COLOR_OFFSET + 0] = cr;
             p[VertexLayout::COLOR_OFFSET + 1] = cg;
             p[VertexLayout::COLOR_OFFSET + 2] = cb;
+            p[VertexLayout::COLOR_OFFSET + 3] = ca;
         }
 
         const std::uint32_t v0 = static_cast<std::uint32_t>(base_v);

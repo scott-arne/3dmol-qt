@@ -99,13 +99,24 @@ SphereImposterPipeline::SphereImposterPipeline(QRhi* rhi, QRhiRenderPassDescript
          VertexLayout::POSITION_OFFSET * static_cast<quint32>(sizeof(float))},
         {0, 1, QRhiVertexInputAttribute::Float3,
          VertexLayout::NORMAL_OFFSET * static_cast<quint32>(sizeof(float))},
-        {0, 2, QRhiVertexInputAttribute::Float3,
+        {0, 2, QRhiVertexInputAttribute::Float4,
          VertexLayout::COLOR_OFFSET * static_cast<quint32>(sizeof(float))},
     });
     pipeline_->setVertexInputLayout(layout);
     pipeline_->setShaderResourceBindings(srb_.get());
     pipeline_->setRenderPassDescriptor(rp);
     pipeline_->setTopology(QRhiGraphicsPipeline::Triangles);
+
+    // Standard (non-premultiplied) source-over alpha blending so per-atom
+    // opacity carried in the vertex color alpha composites over the target.
+    QRhiGraphicsPipeline::TargetBlend blend;
+    blend.enable = true;
+    blend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
+    blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+    blend.srcAlpha = QRhiGraphicsPipeline::One;
+    blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+    pipeline_->setTargetBlends({blend});
+
     pipeline_->setDepthTest(true);
     pipeline_->setDepthWrite(true);
     if (!pipeline_->create()) {
