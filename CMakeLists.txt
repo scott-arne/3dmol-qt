@@ -112,6 +112,7 @@ qt_add_resources(OE3DMOL_SHADER_RES
 add_library(oe3dmol_render
     src/rhi_context.cpp
     src/sphere_imposter_pipeline.cpp
+    src/cylinder_pipeline.cpp
     src/viewer.cpp
     ${OE3DMOL_SHADER_QSB}
     ${OE3DMOL_SHADER_RES}

@@ -5,6 +5,9 @@
 #include "oe3dmol/sphere_imposter_pipeline.h"
 #include "oe3dmol/sphere_imposter_builder.h"
 #include "oe3dmol/camera.h"
+#include "oe3dmol/cylinder_pipeline.h"
+#include "oe3dmol/cylinder_builder.h"
+#include "oe3dmol/bond_data.h"
 
 #include <QGuiApplication>
 #include <QImage>
@@ -112,6 +115,59 @@ TEST(SphereImposterPipelineTest, OpacityDarkensOverBlackBackground) {
     EXPECT_LT(semi.red(), opaque.red() - 30);
     // ...but still clearly rendered (not background black).
     EXPECT_GT(semi.red(), 10);
+}
+
+TEST(CylinderPipelineTest, DrawsHorizontalBond) {
+    const QSize sz(128, 128);
+    RhiContext ctx(sz);
+
+    BondData bonds;
+    bonds.add(QVector3D(-1, 0, 0), QVector3D(1, 0, 0), 0.25f, Color(255, 0, 0), 0u);
+    MeshBuffer unit = build_unit_cylinder(16);
+    std::vector<float> inst = build_cylinder_instances(bonds);
+
+    Camera cam;
+    cam.zoom_to(bonds.bounds);
+
+    CylinderPipeline pipeline(ctx.rhi(), ctx.render_pass_descriptor());
+    ImposterUniforms u;
+    u.view = cam.view_matrix();
+    u.projection = cam.projection_matrix(1.0f);
+    u.model_view = u.view;
+
+    QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+        QRhiResourceUpdateBatch* batch = ctx.rhi()->nextResourceUpdateBatch();
+        pipeline.upload(unit, inst, batch);
+        pipeline.set_uniforms(u, batch);
+        cb->resourceUpdate(batch);
+        pipeline.draw(cb, sz);
+    });
+
+    ASSERT_FALSE(img.isNull());
+    QColor center = img.pixelColor(64, 64);
+    EXPECT_GT(center.red(), 60);
+    EXPECT_LT(center.green(), 60);
+    EXPECT_LT(center.blue(), 60);
+    QColor corner = img.pixelColor(2, 2);
+    EXPECT_LT(corner.red(), 20);
+}
+
+TEST(CylinderPipelineTest, ZeroInstancesIsSafeNoOp) {
+    const QSize sz(64, 64);
+    RhiContext ctx(sz);
+    MeshBuffer unit = build_unit_cylinder(16);
+    std::vector<float> inst;  // empty
+    CylinderPipeline pipeline(ctx.rhi(), ctx.render_pass_descriptor());
+    ImposterUniforms u;
+    QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+        QRhiResourceUpdateBatch* batch = ctx.rhi()->nextResourceUpdateBatch();
+        pipeline.upload(unit, inst, batch);
+        pipeline.set_uniforms(u, batch);
+        cb->resourceUpdate(batch);
+        pipeline.draw(cb, sz);
+    });
+    ASSERT_FALSE(img.isNull());
+    EXPECT_LT(img.pixelColor(32, 32).red(), 20);
 }
 
 }  // namespace test
