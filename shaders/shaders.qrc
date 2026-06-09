@@ -2,5 +2,7 @@
     <qresource prefix="/shaders">
         <file>sphereimposter.vert.qsb</file>
         <file>sphereimposter.frag.qsb</file>
+        <file>cylinder.vert.qsb</file>
+        <file>cylinder.frag.qsb</file>
     </qresource>
 </RCC>

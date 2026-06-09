@@ -100,6 +100,8 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/compile_shaders.cmake)
 oe3dmol_compile_shaders(OE3DMOL_SHADER_QSB
     shaders/sphereimposter.vert
     shaders/sphereimposter.frag
+    shaders/cylinder.vert
+    shaders/cylinder.frag
 )
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/shaders.qrc
