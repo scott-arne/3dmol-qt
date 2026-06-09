@@ -135,8 +135,11 @@ target_link_libraries(oe3dmol_render
 )
 
 # ---- oe3dmol_widget (interactive QRhiWidget; the only QtWidgets consumer) ----
+# The Q_OBJECT header lives under include/oe3dmol; list it explicitly so AUTOMOC
+# moc's it (AUTOMOC does not discover headers via a subdirectory-prefixed include).
 add_library(oe3dmol_widget
     src/molecule_viewer_widget.cpp
+    include/oe3dmol/molecule_viewer_widget.h
 )
 set_target_properties(oe3dmol_widget PROPERTIES POSITION_INDEPENDENT_CODE ON AUTOMOC ON)
 target_include_directories(oe3dmol_widget
@@ -165,7 +168,7 @@ endif()
 # ---- Install / export ----
 include(CMakePackageConfigHelpers)
 
-install(TARGETS oe3dmol_core oe3dmol_geometry oe3dmol_data oe3dmol_render
+install(TARGETS oe3dmol_core oe3dmol_geometry oe3dmol_data oe3dmol_render oe3dmol_widget
     EXPORT oe3dmol-targets
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib

@@ -6,7 +6,7 @@ include(CMakeFindDependencyMacro)
 # INTERFACE_LINK_LIBRARIES. Consumers must have these discoverable.
 # GuiPrivate is required because OE3DMOL::oe3dmol_render links Qt6::GuiPrivate;
 # finding only Core+Gui does not create the Qt6::GuiPrivate imported target.
-find_dependency(Qt6 COMPONENTS Core Gui GuiPrivate)
+find_dependency(Qt6 COMPONENTS Core Gui GuiPrivate Widgets)
 
 # OpenEye is located by a FindOpenEye module that ships alongside this config
 # (installed under the same cmake dir). Prepend it so find_dependency can use it.
