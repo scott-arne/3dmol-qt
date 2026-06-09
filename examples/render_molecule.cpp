@@ -9,11 +9,17 @@
 
 #include "oe3dmol/viewer.h"
 
+#include <string>
+#include <vector>
+
+#include "oe3dmol/stick_style.h"
+#include "oe3dmol/style_spec.h"
+
 int main(int argc, char** argv) {
     QGuiApplication app(argc, argv);
 
     if (argc < 3) {
-        std::cerr << "usage: render_molecule <input.sdf|mol2|pdb> <out.png>\n";
+        std::cerr << "usage: render_molecule <input.sdf|mol2|pdb> <out.png> [sphere|ballstick]\n";
         return 1;
     }
 
@@ -33,7 +39,14 @@ int main(int argc, char** argv) {
         oe3dmol::Viewer viewer(800, 600);
         const OEChem::OEMolBase& base = mol;
         int idx = viewer.add_model(&base);
-        viewer.set_style(idx, oe3dmol::SphereStyle{}.color(oe3dmol::ColorScheme::Jmol));
+        const std::string mode = (argc > 3) ? argv[3] : "sphere";
+        if (mode == "ballstick") {
+            viewer.set_style(idx, std::vector<oe3dmol::StyleSpec>{
+                oe3dmol::SphereStyle{}.scale(0.3).color(oe3dmol::ColorScheme::Jmol),
+                oe3dmol::StickStyle{}.color(oe3dmol::ColorScheme::Jmol)});
+        } else {
+            viewer.set_style(idx, oe3dmol::SphereStyle{}.color(oe3dmol::ColorScheme::Jmol));
+        }
         viewer.zoom_to();
         if (!viewer.render_to_png(argv[2])) {
             std::cerr << "render failed\n";
