@@ -8,6 +8,9 @@
 #include "oe3dmol/cylinder_pipeline.h"
 #include "oe3dmol/cylinder_builder.h"
 #include "oe3dmol/bond_data.h"
+#include "oe3dmol/viewer.h"
+
+#include <oechem.h>
 
 #include <QGuiApplication>
 #include <QImage>
@@ -225,6 +228,41 @@ TEST(CylinderPipelineTest, TwoBondsRenderDistinctPerInstanceColors) {
     EXPECT_TRUE(red_top || red_bottom);    // red rendered somewhere
     EXPECT_TRUE(blue_top || blue_bottom);  // blue rendered somewhere
     EXPECT_NE(red_top, blue_top);          // the two halves differ in color
+}
+
+TEST(ViewerCompositionTest, BallAndStickDrawsBothSphereAndStick) {
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* a = mol.NewAtom(6);
+    OEChem::OEAtomBase* o = mol.NewAtom(8);
+    double ca[3] = {-0.7, 0, 0};
+    double co[3] = {0.7, 0, 0};
+    mol.SetCoords(a, ca);
+    mol.SetCoords(o, co);
+    mol.NewBond(a, o, 1);
+    const OEChem::OEMolBase& base = mol;
+
+    Viewer viewer(200, 200);
+    viewer.set_background_color(QColor(0, 0, 0));
+    int idx = viewer.add_model(&base);
+    viewer.set_style(idx, std::vector<StyleSpec>{
+        SphereStyle{}.scale(0.3), StickStyle{}});
+    QImage img = viewer.render();
+
+    ASSERT_FALSE(img.isNull());
+    int nonblack = 0;
+    for (int y = 0; y < img.height(); y += 4)
+        for (int x = 0; x < img.width(); x += 4)
+            if (img.pixelColor(x, y).red() > 20 || img.pixelColor(x, y).green() > 20 ||
+                img.pixelColor(x, y).blue() > 20)
+                ++nonblack;
+    EXPECT_GT(nonblack, 50);
+    bool red_right = false;
+    for (int y = 0; y < img.height(); y += 2)
+        for (int x = img.width() / 2; x < img.width(); x += 2) {
+            QColor c = img.pixelColor(x, y);
+            if (c.red() > 120 && c.green() < 80 && c.blue() < 80) red_right = true;
+        }
+    EXPECT_TRUE(red_right);
 }
 
 }  // namespace test

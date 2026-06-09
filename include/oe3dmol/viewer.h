@@ -1,7 +1,7 @@
 #pragma once
 
 /// \file viewer.h
-/// \brief Fluent facade tying OpenEye molecules to offscreen sphere rendering.
+/// \brief Fluent facade tying OpenEye molecules to offscreen multi-style rendering.
 
 #include <memory>
 #include <string>
@@ -12,7 +12,9 @@
 #include <QSize>
 
 #include "oe3dmol/atom_data.h"
+#include "oe3dmol/bond_data.h"
 #include "oe3dmol/style.h"
+#include "oe3dmol/style_spec.h"
 
 namespace OEChem {
 class OEMolBase;
@@ -34,8 +36,12 @@ public:
     /// \brief Add a molecule (non-owning). \returns its model index.
     int add_model(const OEChem::OEMolBase* mol);
 
-    /// \brief Apply a sphere style to a model (v1: whole-model selection).
+    /// \brief Apply a single sphere style to a model (whole-model selection).
     void set_style(int model_index, const SphereStyle& style);
+
+    /// \brief Apply a list of styles to a model (e.g. sphere + stick for
+    /// ball-and-stick). Replaces any previously set styles on that model.
+    void set_style(int model_index, const std::vector<StyleSpec>& styles);
 
     /// \brief Set the background color (default white, matching 3dmol).
     void set_background_color(const QColor& color) { background_ = color; }
@@ -53,13 +59,12 @@ public:
 private:
     struct Model {
         const OEChem::OEMolBase* mol = nullptr;
-        SphereStyle style;
+        std::vector<StyleSpec> styles;
     };
 
     QSize size_;
     QColor background_ = QColor(255, 255, 255);
     std::vector<Model> models_;
-    AtomData combined_;  // rebuilt on render
 };
 
 }  // namespace oe3dmol
