@@ -2,14 +2,10 @@
 
 #include "oe3dmol/bond_adapter.h"
 #include "oe3dmol/camera.h"
-#include "oe3dmol/cylinder_builder.h"
-#include "oe3dmol/cylinder_pipeline.h"
-#include "oe3dmol/mesh_buffer.h"
 #include "oe3dmol/mol_adapter.h"
 #include "oe3dmol/render_errors.h"
 #include "oe3dmol/rhi_context.h"
-#include "oe3dmol/sphere_imposter_builder.h"
-#include "oe3dmol/sphere_imposter_pipeline.h"
+#include "oe3dmol/scene_renderer.h"
 
 #include <variant>
 
@@ -87,42 +83,16 @@ QImage Viewer::render() {
         }
     }
 
-    MeshBuffer sphere_mesh = build_sphere_imposters(atoms);
-    MeshBuffer unit_cyl = build_unit_cylinder(16);
-    std::vector<float> instances = build_cylinder_instances(bonds);
-
     Camera cam;
     cam.zoom_to(scene_bounds.valid() ? scene_bounds : atoms.bounds);
 
     RhiContext ctx(size_);
-    SphereImposterPipeline sphere_pipeline(ctx.rhi(), ctx.render_pass_descriptor());
-    CylinderPipeline cyl_pipeline(ctx.rhi(), ctx.render_pass_descriptor());
-
-    ImposterUniforms u;
-    u.view = cam.view_matrix();
-    u.projection = cam.projection_matrix(
-        static_cast<float>(size_.width()) / static_cast<float>(size_.height()));
-    u.model_view = u.view;
+    SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+    renderer.set_geometry(atoms, bonds);
 
     const QSize sz = size_;
-    const bool has_spheres = sphere_mesh.index_count() > 0;
-    const bool has_sticks = !instances.empty();
-
     return ctx.render_frame(background_, [&](QRhiCommandBuffer* cb) {
-        QRhiResourceUpdateBatch* batch = ctx.rhi()->nextResourceUpdateBatch();
-        if (has_spheres) {
-            sphere_pipeline.upload(sphere_mesh, batch);
-            sphere_pipeline.set_uniforms(u, batch);
-        }
-        cyl_pipeline.upload(unit_cyl, instances, batch);
-        cyl_pipeline.set_uniforms(u, batch);
-        cb->resourceUpdate(batch);
-        if (has_spheres) {
-            sphere_pipeline.draw(cb, sz);
-        }
-        if (has_sticks) {
-            cyl_pipeline.draw(cb, sz);
-        }
+        renderer.draw(cb, cam, sz);
     });
 }
 
