@@ -6,6 +6,10 @@
 namespace oe3dmol {
 
 namespace {
+// Derive near/far clip planes from the orbit distance and scene radius. The far
+// extent is measured as one scene radius past the target; valid while the target
+// stays near the scene center (true for zoom_to and bounded pan). near is kept
+// positive via the 0.01*distance floor for very-close dolly.
 void update_clip(float distance, float radius, float& near_out, float& far_out) {
     near_out = std::max(distance - radius, 0.01f * distance);
     far_out = distance + radius;
