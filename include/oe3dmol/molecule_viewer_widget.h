@@ -26,6 +26,11 @@ class SceneRenderer;
 
 /// \brief Live molecular viewer widget: left-drag orbit, wheel zoom, right/shift
 /// -drag pan. Reuses the SceneRenderer; models/styles mirror Viewer.
+///
+/// \note Molecules are held by non-owning pointer and are re-read on every
+///       geometry rebuild (each set_style/add_model and each device-loss
+///       reinitialize). The caller MUST keep every added OEMolBase alive for
+///       the entire lifetime of the widget.
 class MoleculeViewerWidget : public QRhiWidget {
     Q_OBJECT
 public:
@@ -57,6 +62,7 @@ private:
     };
 
     void rebuild_geometry();  // models -> AtomData/BondData -> camera fit
+    void refresh();           // rebuild geometry, re-upload if initialized, repaint
 
     std::vector<Model> models_;
     QColor background_ = QColor(255, 255, 255);

@@ -12,6 +12,7 @@
 #include "oe3dmol/arcball.h"
 #include "oe3dmol/bond_adapter.h"
 #include "oe3dmol/mol_adapter.h"
+#include "oe3dmol/render_errors.h"
 #include "oe3dmol/scene_renderer.h"
 
 namespace oe3dmol {
@@ -22,7 +23,9 @@ MoleculeViewerWidget::~MoleculeViewerWidget() = default;
 
 int MoleculeViewerWidget::add_model(const OEChem::OEMolBase* mol) {
     models_.push_back(Model{mol, {SphereStyle{}}});
-    return static_cast<int>(models_.size()) - 1;
+    const int index = static_cast<int>(models_.size()) - 1;
+    refresh();
+    return index;
 }
 
 void MoleculeViewerWidget::set_style(int model_index, const SphereStyle& style) {
@@ -31,9 +34,13 @@ void MoleculeViewerWidget::set_style(int model_index, const SphereStyle& style) 
 
 void MoleculeViewerWidget::set_style(int model_index, const std::vector<StyleSpec>& styles) {
     if (model_index < 0 || model_index >= static_cast<int>(models_.size())) {
-        return;
+        throw RenderError("MoleculeViewerWidget: set_style model index out of range");
     }
     models_[static_cast<std::size_t>(model_index)].styles = styles;
+    refresh();
+}
+
+void MoleculeViewerWidget::refresh() {
     rebuild_geometry();
     if (renderer_) {
         renderer_->set_geometry(atoms_, bonds_);
@@ -121,7 +128,11 @@ void MoleculeViewerWidget::mouseMoveEvent(QMouseEvent* e) {
 }
 
 void MoleculeViewerWidget::wheelEvent(QWheelEvent* e) {
-    const float steps = static_cast<float>(e->angleDelta().y()) / 120.0f;
+    const int delta_y = e->angleDelta().y();
+    if (delta_y == 0) {
+        return;  // horizontal-only / null wheel: nothing to dolly
+    }
+    const float steps = static_cast<float>(delta_y) / 120.0f;
     camera_.dolly(std::pow(0.9f, steps));  // wheel up = zoom in (distance shrinks)
     update();
 }
