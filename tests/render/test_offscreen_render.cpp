@@ -379,5 +379,81 @@ TEST(SceneRendererTest, OrbitChangesRenderedImage) {
     EXPECT_GT(diff, 5);
 }
 
+TEST(SceneRendererTest, RendersStickSceneNonEmpty) {
+    const QSize sz(128, 128);
+    RhiContext ctx(sz);
+
+    // A single horizontal half-bond (cylinder path; no spheres).
+    AtomData atoms;  // empty
+    BondData bonds;
+    bonds.add(QVector3D(-1, 0, 0), QVector3D(1, 0, 0), 0.3f, Color(0, 255, 0), 0u);
+
+    SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+    renderer.set_geometry(atoms, bonds);
+
+    Camera cam;
+    cam.zoom_to(bonds.bounds);
+
+    QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+        renderer.draw(cb, cam, sz);
+    });
+    ASSERT_FALSE(img.isNull());
+    QColor center = img.pixelColor(64, 64);
+    EXPECT_GT(center.green(), 40);  // green cylinder rendered
+}
+
+TEST(SceneRendererTest, SetGeometryReuploadsOnSecondDraw) {
+    const QSize sz(128, 128);
+    RhiContext ctx(sz);
+
+    SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+
+    // First geometry: a red sphere.
+    AtomData a1;
+    a1.add(QVector3D(0, 0, 0), 1.0f, Color(255, 0, 0), 0u);
+    renderer.set_geometry(a1, BondData{});
+    Camera cam1;
+    cam1.zoom_to(a1.bounds);
+    QImage img1 = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+        renderer.draw(cb, cam1, sz);
+    });
+
+    // Second geometry on the SAME renderer: a blue sphere. Must re-upload.
+    AtomData a2;
+    a2.add(QVector3D(0, 0, 0), 1.0f, Color(0, 0, 255), 0u);
+    renderer.set_geometry(a2, BondData{});
+    Camera cam2;
+    cam2.zoom_to(a2.bounds);
+    QImage img2 = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+        renderer.draw(cb, cam2, sz);
+    });
+
+    ASSERT_FALSE(img1.isNull());
+    ASSERT_FALSE(img2.isNull());
+    // The re-upload took effect: center went from red-dominant to blue-dominant.
+    QColor c1 = img1.pixelColor(64, 64);
+    QColor c2 = img2.pixelColor(64, 64);
+    EXPECT_GT(c1.red(), c1.blue());
+    EXPECT_GT(c2.blue(), c2.red());
+}
+
+TEST(SceneRendererTest, EmptySceneRendersClearedFrame) {
+    const QSize sz(64, 64);
+    RhiContext ctx(sz);
+
+    SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+    // No set_geometry call: nothing to draw.
+    Camera cam;  // default
+
+    QImage img = ctx.render_frame(QColor(10, 20, 30), [&](QRhiCommandBuffer* cb) {
+        renderer.draw(cb, cam, sz);
+    });
+    ASSERT_FALSE(img.isNull());
+    QColor c = img.pixelColor(32, 32);
+    EXPECT_NEAR(c.red(), 10, 4);
+    EXPECT_NEAR(c.green(), 20, 4);
+    EXPECT_NEAR(c.blue(), 30, 4);
+}
+
 }  // namespace test
 }  // namespace oe3dmol

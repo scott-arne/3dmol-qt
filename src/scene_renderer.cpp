@@ -9,7 +9,7 @@
 
 namespace oe3dmol {
 
-SceneRenderer::SceneRenderer(QRhi* rhi, QRhiRenderPassDescriptor* rp) {
+SceneRenderer::SceneRenderer(QRhi* rhi, QRhiRenderPassDescriptor* rp) : rhi_(rhi) {
     spheres_ = std::make_unique<SphereImposterPipeline>(rhi, rp);
     cylinders_ = std::make_unique<CylinderPipeline>(rhi, rp);
     unit_cylinder_ = build_unit_cylinder(16);
@@ -34,7 +34,7 @@ void SceneRenderer::draw(QRhiCommandBuffer* cb, const Camera& camera, const QSiz
             : 1.0f);
     u.model_view = u.view;
 
-    QRhiResourceUpdateBatch* batch = cb->rhi()->nextResourceUpdateBatch();
+    QRhiResourceUpdateBatch* batch = rhi_->nextResourceUpdateBatch();
     if (geometry_dirty_) {
         if (has_spheres_) {
             spheres_->upload(sphere_mesh_, batch);

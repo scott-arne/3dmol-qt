@@ -47,6 +47,7 @@ public:
     void draw(QRhiCommandBuffer* cb, const Camera& camera, const QSize& viewport);
 
 private:
+    QRhi* rhi_ = nullptr;
     std::unique_ptr<SphereImposterPipeline> spheres_;
     std::unique_ptr<CylinderPipeline> cylinders_;
     MeshBuffer sphere_mesh_;
