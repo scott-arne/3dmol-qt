@@ -161,11 +161,15 @@ void CylinderPipeline::upload(const MeshBuffer& mesh, const std::vector<float>& 
     batch->uploadStaticBuffer(vbuf_.get(), mesh.vertices.data());
     batch->uploadStaticBuffer(ibuf_.get(), mesh.indices.data());
 
+    // The instance buffer is re-uploaded every render (bonds can move / restyle),
+    // so it is Static (re-uploadable), unlike the upload-once unit-cylinder mesh.
+    // When called with zero instances, instbuf_ keeps stale data; that is safe
+    // because draw() early-returns on instance_count_ == 0 and never binds it.
     if (instance_count_ > 0) {
         const quint32 instbytes = static_cast<quint32>(instances.size() * sizeof(float));
         if (!instbuf_ || instbuf_->size() < instbytes) {
             instbuf_.reset(
-                rhi_->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, instbytes));
+                rhi_->newBuffer(QRhiBuffer::Static, QRhiBuffer::VertexBuffer, instbytes));
             instbuf_->create();
         }
         batch->uploadStaticBuffer(instbuf_.get(), instances.data());

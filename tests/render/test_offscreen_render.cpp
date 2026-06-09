@@ -170,5 +170,62 @@ TEST(CylinderPipelineTest, ZeroInstancesIsSafeNoOp) {
     EXPECT_LT(img.pixelColor(32, 32).red(), 20);
 }
 
+TEST(CylinderPipelineTest, TwoBondsRenderDistinctPerInstanceColors) {
+    const QSize sz(192, 192);
+    RhiContext ctx(sz);
+
+    // Two well-separated horizontal bonds: a RED one in the upper half (y=+2),
+    // a BLUE one in the lower half (y=-2). If per-instance data is mis-indexed
+    // (e.g. both draw instance 0), we'd see the same color in both regions.
+    BondData bonds;
+    bonds.add(QVector3D(-1, 2, 0), QVector3D(1, 2, 0), 0.3f, Color(255, 0, 0), 0u);
+    bonds.add(QVector3D(-1, -2, 0), QVector3D(1, -2, 0), 0.3f, Color(0, 0, 255), 1u);
+    MeshBuffer unit = build_unit_cylinder(16);
+    std::vector<float> inst = build_cylinder_instances(bonds);
+    ASSERT_EQ(inst.size(), 22u);  // 2 instances * 11 floats
+
+    Camera cam;
+    cam.zoom_to(bonds.bounds);
+
+    CylinderPipeline pipeline(ctx.rhi(), ctx.render_pass_descriptor());
+    ImposterUniforms u;
+    u.view = cam.view_matrix();
+    u.projection = cam.projection_matrix(1.0f);
+    u.model_view = u.view;
+
+    QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+        QRhiResourceUpdateBatch* batch = ctx.rhi()->nextResourceUpdateBatch();
+        pipeline.upload(unit, inst, batch);
+        pipeline.set_uniforms(u, batch);
+        cb->resourceUpdate(batch);
+        pipeline.draw(cb, sz);
+    });
+    ASSERT_FALSE(img.isNull());
+
+    // Scan the upper half for red-dominant pixels and the lower half for
+    // blue-dominant pixels. With camera looking down -Z and +Y up in view space,
+    // world +Y maps to the upper part of the image (smaller y pixel coords).
+    bool red_top = false, blue_bottom = false;
+    bool red_bottom = false, blue_top = false;
+    for (int y = 0; y < img.height(); ++y) {
+        for (int x = 0; x < img.width(); ++x) {
+            const QColor c = img.pixelColor(x, y);
+            const bool isRed = c.red() > 120 && c.green() < 80 && c.blue() < 80;
+            const bool isBlue = c.blue() > 120 && c.red() < 80 && c.green() < 80;
+            if (y < img.height() / 2) {
+                if (isRed) red_top = true;
+                if (isBlue) blue_top = true;
+            } else {
+                if (isRed) red_bottom = true;
+                if (isBlue) blue_bottom = true;
+            }
+        }
+    }
+    // Both colors must appear, in OPPOSITE halves (proving per-instance indexing).
+    EXPECT_TRUE(red_top || red_bottom);    // red rendered somewhere
+    EXPECT_TRUE(blue_top || blue_bottom);  // blue rendered somewhere
+    EXPECT_NE(red_top, blue_top);          // the two halves differ in color
+}
+
 }  // namespace test
 }  // namespace oe3dmol
