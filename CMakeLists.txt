@@ -135,3 +135,17 @@ endif()
 if(OE3DMOL_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
+
+# ---- Install / export ----
+install(TARGETS oe3dmol_core oe3dmol_geometry oe3dmol_data oe3dmol_render
+    EXPORT oe3dmol-targets
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+install(DIRECTORY include/oe3dmol DESTINATION include)
+install(EXPORT oe3dmol-targets
+    FILE OE3DMOLTargets.cmake
+    NAMESPACE OE3DMOL::
+    DESTINATION lib/cmake/oe3dmol
+)
