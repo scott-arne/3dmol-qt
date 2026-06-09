@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <variant>
 
 #include <QMouseEvent>
 #include <QWheelEvent>
@@ -10,9 +9,8 @@
 #include <rhi/qrhi.h>
 
 #include "oe3dmol/arcball.h"
-#include "oe3dmol/bond_adapter.h"
-#include "oe3dmol/mol_adapter.h"
 #include "oe3dmol/render_errors.h"
+#include "oe3dmol/scene_builder.h"
 #include "oe3dmol/scene_renderer.h"
 
 namespace oe3dmol {
@@ -22,7 +20,7 @@ MoleculeViewerWidget::MoleculeViewerWidget(QWidget* parent) : QRhiWidget(parent)
 MoleculeViewerWidget::~MoleculeViewerWidget() = default;
 
 int MoleculeViewerWidget::add_model(const OEChem::OEMolBase* mol) {
-    models_.push_back(Model{mol, {SphereStyle{}}});
+    models_.push_back(SceneModel{mol, {SphereStyle{}}});
     const int index = static_cast<int>(models_.size()) - 1;
     refresh();
     return index;
@@ -54,28 +52,8 @@ void MoleculeViewerWidget::set_background_color(const QColor& color) {
 }
 
 void MoleculeViewerWidget::rebuild_geometry() {
-    atoms_ = AtomData{};
-    bonds_ = BondData{};
     BoundingBox scene_bounds;
-    for (const Model& m : models_) {
-        for (const StyleSpec& spec : m.styles) {
-            if (std::holds_alternative<SphereStyle>(spec)) {
-                AtomData d = build_atom_data(m.mol, std::get<SphereStyle>(spec));
-                for (std::size_t i = 0; i < d.size(); ++i) {
-                    atoms_.add(d.positions[i], d.radii[i], d.colors[i], d.source_idx[i]);
-                    scene_bounds.include(d.positions[i], d.radii[i]);
-                }
-            } else if (std::holds_alternative<StickStyle>(spec)) {
-                BondData b = build_bond_data(m.mol, std::get<StickStyle>(spec));
-                for (std::size_t i = 0; i < b.size(); ++i) {
-                    bonds_.add(b.starts[i], b.ends[i], b.radii[i], b.colors[i],
-                               b.source_bond_idx[i]);
-                    scene_bounds.include(b.starts[i], b.radii[i]);
-                    scene_bounds.include(b.ends[i], b.radii[i]);
-                }
-            }
-        }
-    }
+    build_scene(models_, atoms_, bonds_, scene_bounds);
     if (!camera_initialized_ && scene_bounds.valid()) {
         camera_.zoom_to(scene_bounds);
         camera_initialized_ = true;

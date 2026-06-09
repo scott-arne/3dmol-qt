@@ -13,6 +13,7 @@
 #include "oe3dmol/atom_data.h"
 #include "oe3dmol/bond_data.h"
 #include "oe3dmol/camera.h"
+#include "oe3dmol/scene_builder.h"
 #include "oe3dmol/style.h"
 #include "oe3dmol/style_spec.h"
 
@@ -56,15 +57,10 @@ protected:
     void wheelEvent(QWheelEvent* e) override;
 
 private:
-    struct Model {
-        const OEChem::OEMolBase* mol = nullptr;
-        std::vector<StyleSpec> styles;
-    };
-
     void rebuild_geometry();  // models -> AtomData/BondData -> camera fit
     void refresh();           // rebuild geometry, re-upload if initialized, repaint
 
-    std::vector<Model> models_;
+    std::vector<SceneModel> models_;
     QColor background_ = QColor(255, 255, 255);
 
     std::unique_ptr<SceneRenderer> renderer_;
