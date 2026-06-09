@@ -137,6 +137,8 @@ if(OE3DMOL_BUILD_EXAMPLES)
 endif()
 
 # ---- Install / export ----
+include(CMakePackageConfigHelpers)
+
 install(TARGETS oe3dmol_core oe3dmol_geometry oe3dmol_data oe3dmol_render
     EXPORT oe3dmol-targets
     LIBRARY DESTINATION lib
@@ -147,5 +149,26 @@ install(DIRECTORY include/oe3dmol DESTINATION include)
 install(EXPORT oe3dmol-targets
     FILE OE3DMOLTargets.cmake
     NAMESPACE OE3DMOL::
+    DESTINATION lib/cmake/oe3dmol
+)
+
+# Bundle the FindOpenEye module so the installed config can locate OpenEye.
+install(FILES "${cmake_openeye_SOURCE_DIR}/FindOpenEye.cmake"
+    DESTINATION lib/cmake/oe3dmol
+)
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/OE3DMOLConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/OE3DMOLConfig.cmake"
+    INSTALL_DESTINATION lib/cmake/oe3dmol
+)
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/OE3DMOLConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/OE3DMOLConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/OE3DMOLConfigVersion.cmake"
     DESTINATION lib/cmake/oe3dmol
 )
