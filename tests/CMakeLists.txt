@@ -5,6 +5,8 @@ FetchContent_Declare(
     GIT_TAG v1.15.2
     GIT_SHALLOW TRUE
 )
+# Keep googletest out of our install tree (it ships its own install() rules).
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 include(GoogleTest)
 

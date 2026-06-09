@@ -13,6 +13,14 @@ AtomData one_atom() {
 }
 }  // namespace
 
+TEST(SphereImposterBuilderTest, EmptyInputProducesEmptyMesh) {
+    MeshBuffer m = build_sphere_imposters(AtomData{});
+    EXPECT_EQ(m.vertex_count(), 0u);
+    EXPECT_EQ(m.index_count(), 0u);
+    EXPECT_TRUE(m.vertices.empty());
+    EXPECT_TRUE(m.indices.empty());
+}
+
 TEST(SphereImposterBuilderTest, FourVerticesPerAtom) {
     MeshBuffer m = build_sphere_imposters(one_atom());
     EXPECT_EQ(m.vertex_count(), 4u);

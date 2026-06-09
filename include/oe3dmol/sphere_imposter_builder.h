@@ -19,6 +19,11 @@ namespace oe3dmol {
 ///
 /// \param atoms Atom render data.
 /// \returns A MeshBuffer with 4*N vertices and 6*N indices.
+///
+/// \note Indices are 32-bit (MeshBuffer::indices is uint32_t), so the largest
+///       emitted index 4*N-1 must fit in uint32_t. This caps a single mesh at
+///       roughly 1.07 billion atoms — far beyond any real molecular system, but
+///       a hard ceiling of the 32-bit index format.
 MeshBuffer build_sphere_imposters(const AtomData& atoms);
 
 }  // namespace oe3dmol
