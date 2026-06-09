@@ -5,6 +5,7 @@ add_executable(oe3dmol_core_tests
     test_style.cpp
     test_bounding_box.cpp
     test_camera.cpp
+    test_camera_orbit.cpp
     test_stick_style.cpp
     test_style_spec.cpp
     test_bond_data.cpp
