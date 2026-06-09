@@ -78,6 +78,7 @@ target_link_libraries(oe3dmol_geometry PUBLIC oe3dmol_core)
 # ---- oe3dmol_data ----
 add_library(oe3dmol_data
     src/mol_adapter.cpp
+    src/bond_adapter.cpp
 )
 set_target_properties(oe3dmol_data PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(oe3dmol_data
