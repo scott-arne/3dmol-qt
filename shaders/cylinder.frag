@@ -22,6 +22,17 @@ layout(location = 4) in vec3 vLight;
 layout(location = 0) out vec4 fragColor;
 
 void main() {
+    // Write explicit window depth from the true view-space surface point, using
+    // the SAME formula as sphereimposter.frag. The sphere imposter writes
+    // gl_FragDepth manually; if the cylinder relied on fixed-function depth
+    // instead, the two would sit on different absolute depth scales (Metal's
+    // native NDC z is [0,1], no clip-space correction is applied), so cylinder
+    // caps buried inside a sphere would wrongly win the depth test and render in
+    // front of the ball. Writing depth the same way keeps both on one scale.
+    vec4 clipPos = ubo.projectionMatrix * vec4(vPosView, 1.0);
+    float ndcDepth = clipPos.z / clipPos.w;
+    gl_FragDepth = 0.5 * ndcDepth + 0.5;
+
     vec3 norm = normalize(vNormalView);
     // Two-sided lighting so interior-facing caps/edges are not black.
     float dotProduct = abs(dot(norm, vLight));

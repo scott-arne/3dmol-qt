@@ -437,6 +437,45 @@ TEST(SceneRendererTest, SetGeometryReuploadsOnSecondDraw) {
     EXPECT_GT(c2.blue(), c2.red());
 }
 
+TEST(SceneRendererTest, CylinderCapBuriedInSphereIsOccluded) {
+    const QSize sz(256, 256);
+    RhiContext ctx(sz);
+
+    // A RED sphere at the origin (radius 0.8). A GREEN half-bond whose START is
+    // the atom center (0,0,0) -- its flat cap is therefore buried INSIDE the
+    // sphere -- extending toward the camera (+Z) and to the side. With correct
+    // depth ordering the sphere's front surface occludes the buried cap, so the
+    // sphere center reads RED. With the bug, the green cap floats in front -> green.
+    AtomData atoms;
+    atoms.add(QVector3D(0, 0, 0), 0.8f, Color(255, 0, 0), 0u);
+    BondData bonds;
+    bonds.add(QVector3D(0, 0, 0), QVector3D(0.5f, 0.0f, 0.5f), 0.3f,
+              Color(0, 255, 0), 0u);
+
+    BoundingBox bounds;
+    bounds.include(QVector3D(0, 0, 0), 0.8f);
+    bounds.include(QVector3D(0.5f, 0.0f, 0.5f), 0.3f);
+
+    SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+    renderer.set_geometry(atoms, bonds);
+
+    Camera cam;
+    cam.zoom_to(bounds);
+
+    QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+        renderer.draw(cb, cam, sz);
+    });
+    ASSERT_FALSE(img.isNull());
+
+    // The dead-center pixel projects onto the sphere's front surface (the bond
+    // axis goes toward +Z/+X, so the cap is buried behind the front of the ball
+    // at center). It must read RED (sphere), not GREEN (buried cap bleeding through).
+    QColor center = img.pixelColor(128, 128);
+    EXPECT_GT(center.red(), 80) << "expected red sphere surface at center";
+    EXPECT_LT(center.green(), 80)
+        << "green cylinder cap is bleeding through the opaque sphere (depth bug)";
+}
+
 TEST(SceneRendererTest, EmptySceneRendersClearedFrame) {
     const QSize sz(64, 64);
     RhiContext ctx(sz);
