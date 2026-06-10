@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <string>
+#include <unordered_set>
 
 #include <oechem.h>
 
@@ -65,6 +66,46 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
     }
 
     return data;
+}
+
+AtomData build_stick_joints(const OEChem::OEMolBase* mol, const StickStyle& style) {
+    if (mol == nullptr) {
+        throw DataError("build_stick_joints: molecule is null");
+    }
+
+    AtomData joints;
+    const float radius = static_cast<float>(style.radius());
+
+    // Emit one joint sphere per atom that is an endpoint of at least one
+    // non-degenerate bond. Mirror build_bond_data's bond filtering so a joint
+    // appears exactly where a rendered cylinder endpoint does, and dedupe by
+    // atom index so a shared atom (e.g. the middle of C-C-O) yields one sphere.
+    std::unordered_set<unsigned> seen;
+    for (OESystem::OEIter bond = mol->GetBonds(); bond; ++bond) {
+        const OEChem::OEBondBase& b = *bond;
+        const OEChem::OEAtomBase* abgn = b.GetBgn();
+        const OEChem::OEAtomBase* aend = b.GetEnd();
+        if (abgn == nullptr || aend == nullptr) {
+            continue;
+        }
+
+        const QVector3D p_bgn = atom_pos(mol, abgn);
+        const QVector3D p_end = atom_pos(mol, aend);
+        constexpr float MIN_BOND_LENGTH_SQ = 1.0e-6f;  // (1e-3 A)^2
+        if ((p_end - p_bgn).lengthSquared() < MIN_BOND_LENGTH_SQ) {
+            continue;
+        }
+
+        for (const OEChem::OEAtomBase* atom : {abgn, aend}) {
+            const unsigned aidx = atom->GetIdx();
+            if (seen.insert(aidx).second) {
+                joints.add(atom_pos(mol, atom), radius,
+                           atom_color(style.color(), atom, style.opacity()), aidx);
+            }
+        }
+    }
+
+    return joints;
 }
 
 }  // namespace oe3dmol

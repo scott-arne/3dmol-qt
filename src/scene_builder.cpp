@@ -29,7 +29,8 @@ void build_scene(const std::vector<SceneModel>& models, AtomData& atoms,
                     }
                 }
             } else if (std::holds_alternative<StickStyle>(spec)) {
-                BondData b = build_bond_data(m.mol, std::get<StickStyle>(spec));
+                const StickStyle& stick = std::get<StickStyle>(spec);
+                BondData b = build_bond_data(m.mol, stick);
                 for (std::size_t i = 0; i < b.size(); ++i) {
                     bounds.include(b.starts[i], b.radii[i]);
                     bounds.include(b.ends[i], b.radii[i]);
@@ -40,6 +41,23 @@ void build_scene(const std::vector<SceneModel>& models, AtomData& atoms,
                     for (std::size_t i = 0; i < b.size(); ++i) {
                         bonds.add(b.starts[i], b.ends[i], b.radii[i], b.colors[i],
                                   b.source_bond_idx[i]);
+                    }
+                }
+
+                // Joint spheres (radius = stick radius) at each bonded atom fill
+                // the wedge gaps where angled cylinders meet and round the bond
+                // ends, matching 3dmol's smooth sticks. They feed the sphere
+                // pipeline alongside any SphereStyle atoms.
+                AtomData joints = build_stick_joints(m.mol, stick);
+                for (std::size_t i = 0; i < joints.size(); ++i) {
+                    bounds.include(joints.positions[i], joints.radii[i]);
+                }
+                if (atoms.size() == 0) {
+                    atoms = std::move(joints);
+                } else {
+                    for (std::size_t i = 0; i < joints.size(); ++i) {
+                        atoms.add(joints.positions[i], joints.radii[i],
+                                  joints.colors[i], joints.source_idx[i]);
                     }
                 }
             }
