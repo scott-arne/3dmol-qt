@@ -6,13 +6,22 @@
 namespace oe3dmol {
 
 namespace {
-// Derive near/far clip planes from the orbit distance and scene radius. The far
-// extent is measured as one scene radius past the target; valid while the target
-// stays near the scene center (true for zoom_to and bounded pan). near is kept
-// positive via the 0.01*distance floor for very-close dolly.
+// Fraction of the scene radius added as clip-plane breathing room beyond the
+// bounding sphere on each side.
+constexpr float CLIP_MARGIN_FRACTION = 0.05f;
+
+// Derive near/far clip planes from the orbit distance and scene radius. The
+// bounding sphere (radius `radius`, centered on the orbit target) encloses all
+// geometry and is invariant under orbit, so framing it with a margin on both
+// sides guarantees a full rotation never clips. The planes sit one scene radius
+// plus a margin in front of / behind the target, rather than exactly tangent --
+// a tangent fit leaves extreme vertices on the planes, where float MVP error and
+// imposter billboard slop flicker-clip them. near is kept positive via the
+// 0.01*distance floor for very-close dolly.
 void update_clip(float distance, float radius, float& near_out, float& far_out) {
-    near_out = std::max(distance - radius, 0.01f * distance);
-    far_out = distance + radius;
+    const float margin = radius * CLIP_MARGIN_FRACTION;
+    near_out = std::max(distance - radius - margin, 0.01f * distance);
+    far_out = distance + radius + margin;
 }
 }  // namespace
 

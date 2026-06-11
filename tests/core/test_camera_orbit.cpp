@@ -26,6 +26,72 @@ TEST(CameraOrbitTest, ZoomToMatchesLegacyLookAtMatrix) {
     }
 }
 
+TEST(CameraOrbitTest, ZoomToFramesSceneInsideClipPlanesWithMargin) {
+    // After framing, the whole bounding sphere (radius R, centered on the orbit
+    // target) must sit STRICTLY inside the near/far clip planes -- with a margin,
+    // not merely tangent. A tangent fit (near == D-R, far == D+R) leaves extreme
+    // vertices exactly on the planes, where float MVP error + imposter billboard
+    // slop flicker-clip them at some orbit angles. Require a real gap on both
+    // sides so the scene never touches a plane.
+    for (float r : {0.5f, 5.0f, 500.0f}) {  // tiny, normal, huge molecules
+        BoundingBox box;
+        box.include(QVector3D(0, 0, 0), r);  // bounding_radius = r*sqrt(3)
+        Camera cam;
+        cam.zoom_to(box, 45.0f);
+        const float D = cam.distance();
+        const float R = (box.max() - box.min()).length() * 0.5f;  // bounding sphere radius
+        // Nearest/farthest scene point along the view axis (orbit-invariant).
+        EXPECT_LT(cam.near_plane(), D - R)
+            << "near plane not clear of the scene front (r=" << r << ")";
+        EXPECT_GT(cam.far_plane(), D + R)
+            << "far plane not clear of the scene back (r=" << r << ")";
+        EXPECT_GT(cam.near_plane(), 0.0f) << "near must stay positive (r=" << r << ")";
+        // Margin should scale with the scene, not be a fixed epsilon.
+        EXPECT_GT((D - R) - cam.near_plane(), 0.01f * R)
+            << "front margin too small to absorb float error (r=" << r << ")";
+        EXPECT_GT(cam.far_plane() - (D + R), 0.01f * R)
+            << "back margin too small to absorb float error (r=" << r << ")";
+    }
+}
+
+TEST(CameraOrbitTest, FullOrbitNeverClipsFramedScene) {
+    // The user's requirement: opening any molecule must allow a FULL rotation
+    // from the initial framing with no front/back clipping. Build an asymmetric
+    // box (so the extreme corner sweeps toward/away from the camera as it spins),
+    // frame it, then sample many orbit orientations and assert every box corner
+    // stays within (near, far) along the view axis with room to spare.
+    BoundingBox box;
+    box.include(QVector3D(-2.0f, -0.5f, -3.0f), 0.4f);
+    box.include(QVector3D(4.0f, 1.0f, 2.0f), 0.4f);
+    Camera cam;
+    cam.zoom_to(box, 45.0f);
+
+    const QVector3D mn = box.min(), mx = box.max();
+    const QVector3D corners[8] = {
+        {mn.x(), mn.y(), mn.z()}, {mn.x(), mn.y(), mx.z()},
+        {mn.x(), mx.y(), mn.z()}, {mn.x(), mx.y(), mx.z()},
+        {mx.x(), mn.y(), mn.z()}, {mx.x(), mn.y(), mx.z()},
+        {mx.x(), mx.y(), mn.z()}, {mx.x(), mx.y(), mx.z()},
+    };
+
+    for (int ax = 0; ax < 3; ++ax) {
+        const QVector3D axis(ax == 0 ? 1.f : 0.f, ax == 1 ? 1.f : 0.f, ax == 2 ? 1.f : 0.f);
+        for (float ang = 0.0f; ang < 360.0f; ang += 15.0f) {
+            Camera c = cam;  // copy the framing; only orientation changes
+            c.orbit(QQuaternion::fromAxisAndAngle(axis, ang));
+            const QMatrix4x4 view = c.view_matrix();
+            for (const QVector3D& corner : corners) {
+                const float view_z = view.map(corner).z();  // camera looks down -z
+                const float depth = -view_z;                // positive distance from eye
+                EXPECT_GT(depth, c.near_plane())
+                    << "front clip at axis " << ax << " angle " << ang;
+                EXPECT_LT(depth, c.far_plane())
+                    << "back clip at axis " << ax << " angle " << ang;
+            }
+        }
+    }
+}
+
 TEST(CameraOrbitTest, OrbitChangesViewButKeepsTargetDistance) {
     BoundingBox box;
     box.include(QVector3D(0.0f, 0.0f, 0.0f), 1.0f);

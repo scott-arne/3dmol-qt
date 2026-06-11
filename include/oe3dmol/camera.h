@@ -69,6 +69,12 @@ public:
     /// \brief Camera distance from the target.
     float distance() const { return distance_; }
 
+    /// \brief Near clip plane distance (view space).
+    float near_plane() const { return near_; }
+
+    /// \brief Far clip plane distance (view space).
+    float far_plane() const { return far_; }
+
 private:
     QVector3D target_;
     QQuaternion rotation_;  // identity = look down -Z, +Y up
