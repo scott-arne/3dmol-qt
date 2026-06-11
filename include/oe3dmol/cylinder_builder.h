@@ -1,7 +1,7 @@
 #pragma once
 
 /// \file cylinder_builder.h
-/// \brief Builds the shared unit cylinder mesh and per-bond instance buffers.
+/// \brief Builds the shared billboard base primitive and per-bond instance buffers.
 
 #include <vector>
 

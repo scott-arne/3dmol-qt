@@ -1,7 +1,7 @@
 #pragma once
 
 /// \file cylinder_pipeline.h
-/// \brief Instanced RHI pipeline drawing bond cylinders from a unit mesh + instances.
+/// \brief Instanced RHI pipeline drawing bond cylinders from a billboard base + instances.
 
 #include <memory>
 #include <vector>
@@ -37,7 +37,7 @@ public:
     CylinderPipeline(const CylinderPipeline&) = delete;
     CylinderPipeline& operator=(const CylinderPipeline&) = delete;
 
-    /// \brief Upload the shared unit-cylinder mesh and the per-instance buffer.
+    /// \brief Upload the shared billboard base geometry and the per-instance buffer.
     void upload(const MeshBuffer& mesh, const std::vector<float>& instances,
                 QRhiResourceUpdateBatch* batch);
 
@@ -49,8 +49,8 @@ public:
 
 private:
     QRhi* rhi_ = nullptr;
-    std::unique_ptr<QRhiBuffer> vbuf_;     // unit cylinder vertices
-    std::unique_ptr<QRhiBuffer> ibuf_;     // unit cylinder indices
+    std::unique_ptr<QRhiBuffer> vbuf_;     // billboard base vertices
+    std::unique_ptr<QRhiBuffer> ibuf_;     // billboard base indices
     std::unique_ptr<QRhiBuffer> instbuf_;  // per-instance data
     std::unique_ptr<QRhiBuffer> ubuf_;
     std::unique_ptr<QRhiShaderResourceBindings> srb_;

@@ -162,7 +162,7 @@ void CylinderPipeline::upload(const MeshBuffer& mesh, const std::vector<float>& 
     batch->uploadStaticBuffer(ibuf_.get(), mesh.indices.data());
 
     // The instance buffer is re-uploaded every render (bonds can move / restyle),
-    // so it is Static (re-uploadable), unlike the upload-once unit-cylinder mesh.
+    // so it is Static (re-uploadable), unlike the upload-once billboard base geometry.
     // When called with zero instances, instbuf_ keeps stale data; that is safe
     // because draw() early-returns on instance_count_ == 0 and never binds it.
     if (instance_count_ > 0) {
