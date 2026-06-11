@@ -54,7 +54,12 @@ void Camera::pan(float dx_pixels, float dy_pixels, const QSize& viewport) {
     const QQuaternion inv = rotation_.conjugated();
     const QVector3D right = inv.rotatedVector(QVector3D(1.0f, 0.0f, 0.0f));
     const QVector3D up = inv.rotatedVector(QVector3D(0.0f, 1.0f, 0.0f));
-    target_ += (right * (-dx_pixels) + up * dy_pixels) * scale;
+    // Grab-drag: the content under the cursor follows the cursor, so the target
+    // moves OPPOSITE the drag on BOTH axes (drag right -> target left -> content
+    // shifts right; drag up -> target down -> content shifts up). right/up are
+    // the current view's basis vectors, so pan always acts in the live camera
+    // frame.
+    target_ -= (right * dx_pixels + up * dy_pixels) * scale;
 }
 
 void Camera::move_z(float dy_pixels, const QSize& viewport) {

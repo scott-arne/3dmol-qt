@@ -76,6 +76,65 @@ TEST(CameraOrbitTest, PanRightMovesContentToPositiveViewX) {
     EXPECT_GT(vc.x(), 1e-3f);
 }
 
+TEST(CameraOrbitTest, PanFollowsCursorOnBothAxes) {
+    // Pan is a grab-drag: the content under the cursor must follow the cursor
+    // the SAME way on both axes. The widget hands the camera "rightward pixels"
+    // as +dx and "upward pixels" as +dy. So a +dx drag must push a fixed world
+    // point toward +NDC-x (screen right) and a +dy drag toward +NDC-y (screen
+    // up). A vertical-sign bug (content moving down when you drag up) makes
+    // diagonal drags track at a mirrored angle -- the "skewed pan" symptom.
+    BoundingBox box;
+    box.include(QVector3D(0.0f, 0.0f, 0.0f), 1.0f);
+    const QSize vp(800, 600);
+    auto ndc_of_origin = [&](const Camera& c) {
+        QMatrix4x4 mvp = c.projection_matrix(static_cast<float>(vp.width()) /
+                                             static_cast<float>(vp.height())) *
+                         c.view_matrix();
+        QVector4D clip = mvp * QVector4D(0, 0, 0, 1.0f);
+        return QVector2D(clip.x() / clip.w(), clip.y() / clip.w());  // +y up
+    };
+
+    Camera cright;
+    cright.zoom_to(box, 45.0f);
+    cright.pan(40.0f, 0.0f, vp);  // drag right
+    EXPECT_GT(ndc_of_origin(cright).x(), 1e-3f) << "drag right: content should go screen-right";
+
+    Camera cup;
+    cup.zoom_to(box, 45.0f);
+    cup.pan(0.0f, 40.0f, vp);  // drag up
+    EXPECT_GT(ndc_of_origin(cup).y(), 1e-3f) << "drag up: content should go screen-up";
+}
+
+TEST(CameraOrbitTest, PanUsesCurrentViewAfterOrbit) {
+    // The user's hypothesis: pan might act w.r.t. a previous camera view. pan()
+    // reads the live orientation, so after orbiting, dragging right/up must
+    // STILL move content screen-right/up. Track a fixed world point's NDC.
+    BoundingBox box;
+    box.include(QVector3D(0.0f, 0.0f, 0.0f), 1.0f);
+    const QSize vp(800, 600);
+    const QVector3D probe(0.3f, 0.0f, 0.0f);  // off-center so orbit changes its view pos
+    auto ndc = [&](const Camera& c) {
+        QMatrix4x4 mvp = c.projection_matrix(static_cast<float>(vp.width()) /
+                                             static_cast<float>(vp.height())) *
+                         c.view_matrix();
+        QVector4D clip = mvp * QVector4D(probe, 1.0f);
+        return QVector2D(clip.x() / clip.w(), clip.y() / clip.w());
+    };
+
+    Camera cam;
+    cam.zoom_to(box, 45.0f);
+    cam.orbit(QQuaternion::fromAxisAndAngle(QVector3D(0, 1, 0), 90.0f));
+    cam.orbit(QQuaternion::fromAxisAndAngle(QVector3D(1, 0, 0), 30.0f));
+
+    const QVector2D before = ndc(cam);
+    cam.pan(40.0f, 0.0f, vp);  // drag right
+    EXPECT_GT(ndc(cam).x() - before.x(), 1e-3f) << "after orbit, drag right -> screen-right";
+
+    const QVector2D mid = ndc(cam);
+    cam.pan(0.0f, 40.0f, vp);  // drag up
+    EXPECT_GT(ndc(cam).y() - mid.y(), 1e-3f) << "after orbit, drag up -> screen-up";
+}
+
 TEST(CameraOrbitTest, PanIsAspectIndependentAndCursorScaled) {
     // The skew bug: panning used to divide x by width and y by height, so on a
     // non-square viewport an equal pixel drag in x vs y moved content by
