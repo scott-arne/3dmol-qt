@@ -494,5 +494,95 @@ TEST(SceneRendererTest, EmptySceneRendersClearedFrame) {
     EXPECT_NEAR(c.blue(), 30, 4);
 }
 
+TEST(CylinderPipelineTest, EndCapIsRounded) {
+    // A single short horizontal bond on black; the right end should be a convex
+    // (rounded) cap, not a flat vertical edge. Sample columns near the right end:
+    // a rounded cap's filled height shrinks smoothly to zero; a flat cap drops
+    // from full height to zero in one column.
+    const QSize sz(256, 128);
+    RhiContext ctx(sz);
+    BondData bonds;
+    bonds.add(QVector3D(-0.6f, 0, 0), QVector3D(0.6f, 0, 0), 0.3f, Color(0, 255, 0), 0u);
+    MeshBuffer bb = build_cylinder_billboard();
+    std::vector<float> inst = build_cylinder_instances(bonds);
+    Camera cam; cam.zoom_to(bonds.bounds);
+    CylinderPipeline pipeline(ctx.rhi(), ctx.render_pass_descriptor());
+    ImposterUniforms u;
+    u.view = cam.view_matrix();
+    u.projection = cam.projection_matrix(static_cast<float>(sz.width()) / sz.height());
+    u.model_view = u.view;
+    QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+        QRhiResourceUpdateBatch* b = ctx.rhi()->nextResourceUpdateBatch();
+        pipeline.upload(bb, inst, b);
+        pipeline.set_uniforms(u, b);
+        cb->resourceUpdate(b);
+        pipeline.draw(cb, sz);
+    });
+    ASSERT_FALSE(img.isNull());
+    // Find the rightmost column containing any green, and a column 6px left of it.
+    auto green_height = [&](int x) {
+        int h = 0;
+        for (int y = 0; y < sz.height(); ++y) {
+            QColor c = img.pixelColor(x, y);
+            if (c.green() > 80 && c.red() < 80) ++h;
+        }
+        return h;
+    };
+    int rightmost = -1;
+    for (int x = sz.width() - 1; x >= 0; --x) { if (green_height(x) > 0) { rightmost = x; break; } }
+    ASSERT_GT(rightmost, 10);
+    // Rounded cap: the edge column has much less filled height than 6px inward.
+    EXPECT_LT(green_height(rightmost), green_height(rightmost - 6))
+        << "end cap is flat, not rounded";
+}
+
+TEST(SceneRendererTest, BentBondJointHasNoHoleAndNoSeam) {
+    const QSize sz(256, 256);
+    RhiContext ctx(sz);
+    // Bent path A-B-C (~120 deg) as sticks only, via two half-bonds per bond.
+    AtomData atoms;  // sticks only: no atom spheres
+    BondData bonds;
+    QVector3D a(-1.0f, 0.3f, 0), b(0.0f, -0.3f, 0), c(1.0f, 0.3f, 0);
+    QVector3D mid_ab = (a + b) * 0.5f, mid_bc = (b + c) * 0.5f;
+    Color grey(144, 144, 144);
+    bonds.add(a, mid_ab, 0.25f, grey, 0u);
+    bonds.add(b, mid_ab, 0.25f, grey, 0u);  // half-bonds meeting at B's first bond
+    bonds.add(b, mid_bc, 0.25f, grey, 1u);
+    bonds.add(c, mid_bc, 0.25f, grey, 1u);
+    BoundingBox bounds;
+    for (const QVector3D& p : {a, b, c, mid_ab, mid_bc}) bounds.include(p, 0.25f);
+
+    SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+    renderer.set_geometry(atoms, bonds);
+    Camera cam; cam.zoom_to(bounds);
+    QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+        renderer.draw(cb, cam, sz);
+    });
+    ASSERT_FALSE(img.isNull());
+
+    // Project vertex B to screen and inspect a disk around it. Within the bond
+    // region near B there must be NO background-black hole (the imposter caps
+    // fill it), and the grey values must be continuous (no sharp seam step).
+    QVector3D bview = cam.view_matrix().map(b);
+    QMatrix4x4 proj = cam.projection_matrix(1.0f);
+    QVector4D clip4 = proj * QVector4D(bview, 1.0f);
+    QVector3D clip = clip4.toVector3D() / clip4.w();  // perspective divide
+    int bx = static_cast<int>((clip.x() * 0.5f + 0.5f) * sz.width());
+    int by = static_cast<int>((1.0f - (clip.y() * 0.5f + 0.5f)) * sz.height());
+
+    int grey_px = 0, black_px = 0;
+    for (int dy = -6; dy <= 6; ++dy) {
+        for (int dx = -6; dx <= 6; ++dx) {
+            int x = bx + dx, y = by + dy;
+            if (x < 0 || y < 0 || x >= sz.width() || y >= sz.height()) continue;
+            QColor cc = img.pixelColor(x, y);
+            bool blackish = cc.red() < 25 && cc.green() < 25 && cc.blue() < 25;
+            if (blackish) ++black_px; else ++grey_px;
+        }
+    }
+    EXPECT_GT(grey_px, 0) << "joint region empty";
+    EXPECT_EQ(black_px, 0) << "background hole at the bond joint (caps not filling)";
+}
+
 }  // namespace test
 }  // namespace oe3dmol

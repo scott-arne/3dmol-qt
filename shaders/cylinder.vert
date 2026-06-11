@@ -41,30 +41,38 @@ void main() {
     vP2 = to.xyz;
     vec3 axis = to.xyz - pt.xyz;
 
-    // Anchor the billboard at the endpoint this vertex selects (3dmol: nearer
-    // point is billboarded; we use the per-vertex endpoint_sel which 3dmol
-    // encodes via the color-blue sign). corner.x = +1 -> p1, -1 -> p2.
-    vec4 mvPosition = (corner.x >= 0.0) ? pt : to;
-    float mult = (corner.x >= 0.0) ? 1.1 : -1.1;  // slop, sign per endpoint
-
+    // Build an oriented billboard rectangle that fully encloses the capsule's
+    // screen silhouette (body + both hemispherical end caps). Anchor each vertex
+    // at the endpoint it selects (corner.x = +1 -> p1, -1 -> p2), then push it
+    // OUTWARD along the bond axis (away from the other endpoint) so the quad
+    // extends past each cap, and laterally by the radius.
+    //
+    // The original 3dmol shader relied on a camera-plane projection of the
+    // anchor to enlarge the quad; in this port that projection collapsed to a
+    // no-op (the anchor maps to itself), so the quad never extended past the
+    // endpoints and the far half of each hemispherical cap was clipped, leaving
+    // a background hole at bond joints. Pushing along the axis instead covers
+    // the whole capsule for every orientation.
+    vec3 anchor = (corner.x >= 0.0) ? vP1 : vP2;
     bool isperspective = (ubo.projectionMatrix[3][3] == 0.0);
-    vec3 n = normalize(mvPosition.xyz);
-    if (isperspective) {
-        // Project the anchor onto the camera-facing plane through the endpoint.
-        vec3 anchor = (corner.x >= 0.0) ? vP1 : vP2;
-        vec3 pnorm = normalize(anchor);
-        float t = dot(mvPosition.xyz - anchor, n) / dot(pnorm, n);
-        mvPosition.xyz = anchor + t * pnorm;
-    } else {
-        mvPosition.xyz = (corner.x >= 0.0) ? vP1 : vP2;
-    }
 
-    // Push the corner outward by radius along two screen-perpendicular axes.
-    // corner.y selects the lateral direction (3dmol uses the radius sign).
-    vec3 rdir = isperspective ? mvPosition.xyz : vec3(0.0, 0.0, -1.0);
-    vec3 cr = normalize(cross(rdir, axis)) * (instRadius * corner.y);
-    vec3 doublecr = normalize(cross(rdir, cr)) * instRadius;
-    mvPosition.xyz += mult * (cr + doublecr);
+    // View-space ray direction toward the anchor (perspective) or straight back
+    // (orthographic); the lateral axis is perpendicular to both the ray and the
+    // bond axis, matching the frag-shader ray setup.
+    vec3 rdir = isperspective ? normalize(anchor) : vec3(0.0, 0.0, -1.0);
+    vec3 axisDir = normalize(axis);
+    vec3 lateral = normalize(cross(rdir, axisDir));
+
+    // Outward sign along the axis: -1 at p1, +1 at p2. Lateral sign combines the
+    // corner sign with the endpoint so vertices 0,1,2,3 trace the rectangle
+    // perimeter (not a bow-tie) under the existing {0,1,2, 2,3,0} index order.
+    float axialSign = (corner.x >= 0.0) ? -1.0 : 1.0;
+    float lateralSign = corner.y * corner.x;
+    float slop = 1.1;  // small margin so rasterized fragments fully cover the cap
+
+    vec4 mvPosition = vec4(anchor, 1.0);
+    mvPosition.xyz += axialSign * axisDir * (instRadius * slop);
+    mvPosition.xyz += lateralSign * lateral * (instRadius * slop);
 
     vCpos = mvPosition.xyz;
     gl_Position = ubo.projectionMatrix * vec4(mvPosition.xyz, 1.0);
