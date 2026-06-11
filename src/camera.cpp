@@ -37,11 +37,33 @@ void Camera::dolly(float factor) {
     update_clip(distance_, scene_radius_, near_, far_);
 }
 
-void Camera::pan(float dx, float dy) {
+namespace {
+// World units spanned by one pixel at the target plane: the visible world
+// height there is 2*distance*tan(fov_y/2); dividing by the viewport pixel height
+// gives the per-pixel scale. Using viewport HEIGHT for both axes keeps square
+// pixels square (no aspect skew) and makes a drag track the cursor 1:1.
+float world_units_per_pixel(float distance, float fov_y_degrees, const QSize& viewport) {
+    const int h = std::max(viewport.height(), 1);
+    const float half_fov_rad = (fov_y_degrees * 0.5f) * static_cast<float>(M_PI) / 180.0f;
+    return 2.0f * distance * std::tan(half_fov_rad) / static_cast<float>(h);
+}
+}  // namespace
+
+void Camera::pan(float dx_pixels, float dy_pixels, const QSize& viewport) {
+    const float scale = world_units_per_pixel(distance_, fov_y_, viewport);
     const QQuaternion inv = rotation_.conjugated();
     const QVector3D right = inv.rotatedVector(QVector3D(1.0f, 0.0f, 0.0f));
     const QVector3D up = inv.rotatedVector(QVector3D(0.0f, 1.0f, 0.0f));
-    target_ += (right * (-dx) + up * dy) * distance_;
+    target_ += (right * (-dx_pixels) + up * dy_pixels) * scale;
+}
+
+void Camera::move_z(float dy_pixels, const QSize& viewport) {
+    // Drag up (dy_pixels < 0) moves the camera toward the scene (distance
+    // shrinks). Deliberately does NOT call update_clip: holding near/far fixed
+    // lets the near plane slice into the geometry for clip inspection.
+    const float scale = world_units_per_pixel(distance_, fov_y_, viewport);
+    const float min_d = 1e-3f * scene_radius_;
+    distance_ = std::max(distance_ + dy_pixels * scale, min_d);
 }
 
 QMatrix4x4 Camera::view_matrix() const {

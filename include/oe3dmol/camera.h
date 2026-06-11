@@ -5,6 +5,7 @@
 
 #include <QMatrix4x4>
 #include <QQuaternion>
+#include <QSize>
 #include <QVector3D>
 
 #include "oe3dmol/bounding_box.h"
@@ -28,12 +29,36 @@ public:
     void orbit(const QQuaternion& delta);
 
     /// \brief Scale the orbit distance by factor (clamped > 0). <1 zooms in.
+    ///
+    /// Re-derives the near/far clip planes from the new distance, so the scene
+    /// stays fully framed (wheel-zoom behavior). Use move_z to drive the camera
+    /// through the near plane for clipping inspection.
     void dolly(float factor);
 
-    /// \brief Shift the target in the camera's right/up plane (screen pan).
-    /// \param dx Rightward fraction (scaled by distance).
-    /// \param dy Upward fraction (scaled by distance).
-    void pan(float dx, float dy);
+    /// \brief Shift the target in the camera's right/up plane to track a screen
+    /// drag 1:1 (screen pan).
+    ///
+    /// The pixel deltas are converted to world units using the true
+    /// world-units-per-pixel at the target plane
+    /// (2*distance*tan(fov/2)/viewport_height), the same scale on both axes so
+    /// the content follows the cursor without aspect-ratio skew.
+    ///
+    /// \param dx_pixels Rightward drag in pixels.
+    /// \param dy_pixels Upward drag in pixels (screen-up positive).
+    /// \param viewport Viewport size in pixels (for the world-per-pixel scale).
+    void pan(float dx_pixels, float dy_pixels, const QSize& viewport);
+
+    /// \brief Move the camera along its view axis by a screen drag, WITHOUT
+    /// re-deriving the clip planes (unlike dolly).
+    ///
+    /// Holding the near/far planes fixed lets the camera advance through the
+    /// near plane so geometry clips, which is the point of this control
+    /// (interactive clip-plane inspection). Distance is kept positive.
+    ///
+    /// \param dy_pixels Drag in pixels; negative (drag up) moves toward the
+    ///        scene, positive (drag down) moves away.
+    /// \param viewport Viewport size in pixels (for the world-per-pixel scale).
+    void move_z(float dy_pixels, const QSize& viewport);
 
     /// \brief View matrix (world -> camera).
     QMatrix4x4 view_matrix() const;

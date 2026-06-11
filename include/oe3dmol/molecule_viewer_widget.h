@@ -26,7 +26,8 @@ namespace oe3dmol {
 class SceneRenderer;
 
 /// \brief Live molecular viewer widget: left-drag orbit, wheel zoom, right/shift
-/// -drag pan. Reuses the SceneRenderer; models/styles mirror Viewer.
+/// -drag pan, middle-drag move the camera along its view axis (clip inspection).
+/// Reuses the SceneRenderer; models/styles mirror Viewer.
 ///
 /// \note Molecules are held by non-owning pointer and are re-read on every
 ///       geometry rebuild (each set_style/add_model and each device-loss

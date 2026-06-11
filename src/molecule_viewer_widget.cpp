@@ -89,14 +89,20 @@ void MoleculeViewerWidget::mousePressEvent(QMouseEvent* e) {
 
 void MoleculeViewerWidget::mouseMoveEvent(QMouseEvent* e) {
     const QPoint pos = e->position().toPoint();
+    const float dx = static_cast<float>(pos.x() - last_pos_.x());
+    const float dy = static_cast<float>(pos.y() - last_pos_.y());
     const bool pan = (e->buttons() & Qt::RightButton) ||
                      ((e->buttons() & Qt::LeftButton) && (e->modifiers() & Qt::ShiftModifier));
     if (pan) {
-        const float dx = static_cast<float>(pos.x() - last_pos_.x()) /
-                         static_cast<float>(std::max(width(), 1));
-        const float dy = static_cast<float>(pos.y() - last_pos_.y()) /
-                         static_cast<float>(std::max(height(), 1));
-        camera_.pan(dx, -dy);  // screen-down is -world-up
+        // Pass raw pixel deltas; the camera converts them to world units with a
+        // single per-pixel scale so the content tracks the cursor without skew.
+        camera_.pan(dx, -dy, size());  // screen-down is -world-up
+        update();
+    } else if (e->buttons() & Qt::MiddleButton) {
+        // Middle-drag moves the camera along its view axis without re-fitting
+        // the clip planes, so dragging up pushes the near plane into the scene
+        // (clip-plane inspection). Drag up = toward scene (negative dy).
+        camera_.move_z(-dy, size());
         update();
     } else if (e->buttons() & Qt::LeftButton) {
         camera_.orbit(arcball_rotation(QPointF(last_pos_), QPointF(pos), size()));
