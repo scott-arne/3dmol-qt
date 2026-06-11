@@ -95,7 +95,7 @@ CylinderPipeline::CylinderPipeline(QRhi* rhi, QRhiRenderPassDescriptor* rp)
     });
 
     const quint32 vstride =
-        CylinderVertexLayout::FLOATS_PER_VERTEX * static_cast<quint32>(sizeof(float));
+        CylinderBillboardLayout::FLOATS_PER_VERTEX * static_cast<quint32>(sizeof(float));
     const quint32 istride =
         CylinderInstanceLayout::FLOATS_PER_INSTANCE * static_cast<quint32>(sizeof(float));
 
@@ -105,17 +105,17 @@ CylinderPipeline::CylinderPipeline(QRhi* rhi, QRhiRenderPassDescriptor* rp)
         {istride, QRhiVertexInputBinding::PerInstance, 1},
     });
     layout.setAttributes({
-        {0, 0, QRhiVertexInputAttribute::Float3,
-         CylinderVertexLayout::POSITION_OFFSET * static_cast<quint32>(sizeof(float))},
-        {0, 1, QRhiVertexInputAttribute::Float3,
-         CylinderVertexLayout::NORMAL_OFFSET * static_cast<quint32>(sizeof(float))},
-        {1, 2, QRhiVertexInputAttribute::Float3,
+        // binding 0: billboard base vertex (endpoint_sel, corner_sign)
+        {0, 0, QRhiVertexInputAttribute::Float2,
+         CylinderBillboardLayout::ENDPOINT_SEL_OFFSET * static_cast<quint32>(sizeof(float))},
+        // binding 1: per-instance start, end, radius, color
+        {1, 1, QRhiVertexInputAttribute::Float3,
          CylinderInstanceLayout::START_OFFSET * static_cast<quint32>(sizeof(float))},
-        {1, 3, QRhiVertexInputAttribute::Float3,
+        {1, 2, QRhiVertexInputAttribute::Float3,
          CylinderInstanceLayout::END_OFFSET * static_cast<quint32>(sizeof(float))},
-        {1, 4, QRhiVertexInputAttribute::Float,
+        {1, 3, QRhiVertexInputAttribute::Float,
          CylinderInstanceLayout::RADIUS_OFFSET * static_cast<quint32>(sizeof(float))},
-        {1, 5, QRhiVertexInputAttribute::Float4,
+        {1, 4, QRhiVertexInputAttribute::Float4,
          CylinderInstanceLayout::COLOR_OFFSET * static_cast<quint32>(sizeof(float))},
     });
     pipeline_->setVertexInputLayout(layout);

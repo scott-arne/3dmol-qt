@@ -51,7 +51,7 @@ private:
     std::unique_ptr<SphereImposterPipeline> spheres_;
     std::unique_ptr<CylinderPipeline> cylinders_;
     MeshBuffer sphere_mesh_;
-    MeshBuffer unit_cylinder_;
+    MeshBuffer cylinder_billboard_;
     std::vector<float> instances_;
     bool geometry_dirty_ = false;
     bool has_spheres_ = false;

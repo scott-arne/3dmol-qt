@@ -130,7 +130,7 @@ TEST(CylinderPipelineTest, DrawsHorizontalBond) {
 
     BondData bonds;
     bonds.add(QVector3D(-1, 0, 0), QVector3D(1, 0, 0), 0.25f, Color(255, 0, 0), 0u);
-    MeshBuffer unit = build_unit_cylinder(16);
+    MeshBuffer unit = build_cylinder_billboard();
     std::vector<float> inst = build_cylinder_instances(bonds);
 
     Camera cam;
@@ -162,7 +162,7 @@ TEST(CylinderPipelineTest, DrawsHorizontalBond) {
 TEST(CylinderPipelineTest, ZeroInstancesIsSafeNoOp) {
     const QSize sz(64, 64);
     RhiContext ctx(sz);
-    MeshBuffer unit = build_unit_cylinder(16);
+    MeshBuffer unit = build_cylinder_billboard();
     std::vector<float> inst;  // empty
     CylinderPipeline pipeline(ctx.rhi(), ctx.render_pass_descriptor());
     ImposterUniforms u;
@@ -187,7 +187,7 @@ TEST(CylinderPipelineTest, TwoBondsRenderDistinctPerInstanceColors) {
     BondData bonds;
     bonds.add(QVector3D(-1, 2, 0), QVector3D(1, 2, 0), 0.3f, Color(255, 0, 0), 0u);
     bonds.add(QVector3D(-1, -2, 0), QVector3D(1, -2, 0), 0.3f, Color(0, 0, 255), 1u);
-    MeshBuffer unit = build_unit_cylinder(16);
+    MeshBuffer unit = build_cylinder_billboard();
     std::vector<float> inst = build_cylinder_instances(bonds);
     ASSERT_EQ(inst.size(), 22u);  // 2 instances * 11 floats
 
