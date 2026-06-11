@@ -1,91 +1,26 @@
 #include "oe3dmol/cylinder_builder.h"
 
-#include <cmath>
-
 #include "oe3dmol/cylinder_layouts.h"
-#include "oe3dmol/geometry_errors.h"
 
 namespace oe3dmol {
 
-namespace {
-
-constexpr float PI_F = 3.14159265358979323846f;
-
-void push_vertex(std::vector<float>& v, float px, float py, float pz,
-                 float nx, float ny, float nz) {
-    v.push_back(px);
-    v.push_back(py);
-    v.push_back(pz);
-    v.push_back(nx);
-    v.push_back(ny);
-    v.push_back(nz);
-}
-
-}  // namespace
-
-MeshBuffer build_unit_cylinder(int segments) {
-    if (segments < 3) {
-        throw GeometryError("build_unit_cylinder: segments must be >= 3");
-    }
-
+MeshBuffer build_cylinder_billboard() {
     MeshBuffer mesh;
-    auto& vtx = mesh.vertices;
-    auto& idx = mesh.indices;
-
-    // --- Side surface: 2 rings (z=0, z=1) of `segments` vertices, radial normals.
-    for (int ring = 0; ring < 2; ++ring) {
-        const float z = static_cast<float>(ring);
-        for (int s = 0; s < segments; ++s) {
-            const float theta = (2.0f * PI_F * static_cast<float>(s)) /
-                                static_cast<float>(segments);
-            const float cx = std::cos(theta);
-            const float cy = std::sin(theta);
-            push_vertex(vtx, cx, cy, z, cx, cy, 0.0f);  // radial normal
-        }
+    // 4 vertices: (endpoint_sel, corner_sign) for the 4 quad corners.
+    // Two anchored at p1 (+1) with corner signs -/+, two at p2 (-1) with -/+.
+    const float verts[4][2] = {
+        {+1.0f, -1.0f},
+        {+1.0f, +1.0f},
+        {-1.0f, -1.0f},
+        {-1.0f, +1.0f},
+    };
+    mesh.vertices.reserve(4 * CylinderBillboardLayout::FLOATS_PER_VERTEX);
+    for (const auto& v : verts) {
+        mesh.vertices.push_back(v[0]);
+        mesh.vertices.push_back(v[1]);
     }
-    for (int s = 0; s < segments; ++s) {
-        const std::uint32_t b0 = static_cast<std::uint32_t>(s);
-        const std::uint32_t b1 = static_cast<std::uint32_t>((s + 1) % segments);
-        const std::uint32_t t0 = b0 + static_cast<std::uint32_t>(segments);
-        const std::uint32_t t1 = b1 + static_cast<std::uint32_t>(segments);
-        idx.push_back(b0); idx.push_back(b1); idx.push_back(t1);
-        idx.push_back(b0); idx.push_back(t1); idx.push_back(t0);
-    }
-
-    // --- Bottom cap: center + fan, normal -Z.
-    const std::uint32_t bottom_center = static_cast<std::uint32_t>(
-        vtx.size() / CylinderVertexLayout::FLOATS_PER_VERTEX);
-    push_vertex(vtx, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f);
-    const std::uint32_t bottom_rim_start = bottom_center + 1;
-    for (int s = 0; s < segments; ++s) {
-        const float theta = (2.0f * PI_F * static_cast<float>(s)) /
-                            static_cast<float>(segments);
-        push_vertex(vtx, std::cos(theta), std::sin(theta), 0.0f, 0.0f, 0.0f, -1.0f);
-    }
-    for (int s = 0; s < segments; ++s) {
-        const std::uint32_t r0 = bottom_rim_start + static_cast<std::uint32_t>(s);
-        const std::uint32_t r1 = bottom_rim_start +
-            static_cast<std::uint32_t>((s + 1) % segments);
-        idx.push_back(bottom_center); idx.push_back(r1); idx.push_back(r0);
-    }
-
-    // --- Top cap: center + fan, normal +Z.
-    const std::uint32_t top_center = static_cast<std::uint32_t>(
-        vtx.size() / CylinderVertexLayout::FLOATS_PER_VERTEX);
-    push_vertex(vtx, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f);
-    const std::uint32_t top_rim_start = top_center + 1;
-    for (int s = 0; s < segments; ++s) {
-        const float theta = (2.0f * PI_F * static_cast<float>(s)) /
-                            static_cast<float>(segments);
-        push_vertex(vtx, std::cos(theta), std::sin(theta), 1.0f, 0.0f, 0.0f, 1.0f);
-    }
-    for (int s = 0; s < segments; ++s) {
-        const std::uint32_t r0 = top_rim_start + static_cast<std::uint32_t>(s);
-        const std::uint32_t r1 = top_rim_start +
-            static_cast<std::uint32_t>((s + 1) % segments);
-        idx.push_back(top_center); idx.push_back(r0); idx.push_back(r1);
-    }
-
+    // Two triangles: (0,1,2),(2,3,0) -- matches 3dmol's stick face winding.
+    mesh.indices = {0u, 1u, 2u, 2u, 3u, 0u};
     return mesh;
 }
 

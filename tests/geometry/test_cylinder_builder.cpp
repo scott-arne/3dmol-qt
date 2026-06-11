@@ -2,49 +2,32 @@
 
 #include "oe3dmol/cylinder_builder.h"
 #include "oe3dmol/cylinder_layouts.h"
-#include "oe3dmol/geometry_errors.h"
-
-#include <cmath>
 
 namespace oe3dmol {
 namespace test {
 
-TEST(CylinderBuilderTest, RejectsTooFewSegments) {
-    EXPECT_THROW(build_unit_cylinder(2), GeometryError);
+TEST(CylinderBuilderTest, BillboardHasFourVerticesSixIndices) {
+    MeshBuffer m = build_cylinder_billboard();
+    EXPECT_EQ(m.vertices.size(),
+              static_cast<std::size_t>(4 * CylinderBillboardLayout::FLOATS_PER_VERTEX));
+    EXPECT_EQ(m.indices.size(), 6u);
 }
 
-TEST(CylinderBuilderTest, UnitCylinderHasExpectedVertexStride) {
-    MeshBuffer m = build_unit_cylinder(16);
-    EXPECT_EQ(m.vertices.size() % CylinderVertexLayout::FLOATS_PER_VERTEX, 0u);
-    EXPECT_GT(m.vertices.size(), 0u);
-    EXPECT_GT(m.indices.size(), 0u);
-}
-
-TEST(CylinderBuilderTest, SideVerticesLieWithinUnitRadiusAndHeight) {
-    MeshBuffer m = build_unit_cylinder(16);
-    constexpr int S = CylinderVertexLayout::FLOATS_PER_VERTEX;
-    const std::size_t vcount = m.vertices.size() / S;
-    for (std::size_t v = 0; v < vcount; ++v) {
-        const float x = m.vertices[v * S + 0];
-        const float y = m.vertices[v * S + 1];
-        const float z = m.vertices[v * S + 2];
-        EXPECT_LE(std::sqrt(x * x + y * y), 1.0f + 1e-4f);
-        EXPECT_GE(z, -1e-4f);
-        EXPECT_LE(z, 1.0f + 1e-4f);
+TEST(CylinderBuilderTest, BillboardVerticesCoverAllCornerCombinations) {
+    MeshBuffer m = build_cylinder_billboard();
+    constexpr int S = CylinderBillboardLayout::FLOATS_PER_VERTEX;
+    // Collect the 4 (endpoint_sel, corner_sign) pairs; expect both p1 anchors
+    // and both p2 anchors, each with both corner signs.
+    bool p1_neg = false, p1_pos = false, p2_neg = false, p2_pos = false;
+    for (int v = 0; v < 4; ++v) {
+        const float sel = m.vertices[v * S + CylinderBillboardLayout::ENDPOINT_SEL_OFFSET];
+        const float sign = m.vertices[v * S + CylinderBillboardLayout::CORNER_SIGN_OFFSET];
+        if (sel > 0 && sign < 0) p1_neg = true;
+        if (sel > 0 && sign > 0) p1_pos = true;
+        if (sel < 0 && sign < 0) p2_neg = true;
+        if (sel < 0 && sign > 0) p2_pos = true;
     }
-}
-
-TEST(CylinderBuilderTest, SideNormalsAreUnitLength) {
-    MeshBuffer m = build_unit_cylinder(16);
-    constexpr int S = CylinderVertexLayout::FLOATS_PER_VERTEX;
-    constexpr int N = CylinderVertexLayout::NORMAL_OFFSET;
-    const std::size_t vcount = m.vertices.size() / S;
-    for (std::size_t v = 0; v < vcount; ++v) {
-        const float nx = m.vertices[v * S + N + 0];
-        const float ny = m.vertices[v * S + N + 1];
-        const float nz = m.vertices[v * S + N + 2];
-        EXPECT_NEAR(std::sqrt(nx * nx + ny * ny + nz * nz), 1.0f, 1e-4f);
-    }
+    EXPECT_TRUE(p1_neg && p1_pos && p2_neg && p2_pos);
 }
 
 TEST(CylinderBuilderTest, InstancesPackStartEndRadiusColor) {
@@ -69,15 +52,6 @@ TEST(CylinderBuilderTest, InstancesPackStartEndRadiusColor) {
 TEST(CylinderBuilderTest, EmptyBondsProduceEmptyInstances) {
     std::vector<float> inst = build_cylinder_instances(BondData{});
     EXPECT_TRUE(inst.empty());
-}
-
-TEST(CylinderBuilderTest, ExactVertexAndIndexCountFor16Segments) {
-    MeshBuffer m = build_unit_cylinder(16);
-    constexpr int S = CylinderVertexLayout::FLOATS_PER_VERTEX;
-    // 2 side rings (32) + bottom cap (1 center + 16 rim) + top cap (17) = 66.
-    EXPECT_EQ(m.vertices.size(), static_cast<std::size_t>(66 * S));
-    // side 6*16 + bottom 3*16 + top 3*16 = 192.
-    EXPECT_EQ(m.indices.size(), 192u);
 }
 
 }  // namespace test

@@ -10,17 +10,14 @@
 
 namespace oe3dmol {
 
-/// \brief Build a tessellated unit cylinder (axis +Z, z in [0,1], unit radius).
+/// \brief Build the shared billboard base primitive for cylinder imposters.
 ///
-/// The side surface has `segments` radial divisions with outward radial normals;
-/// flat end caps are included (center-fan triangles at z=0 and z=1). Uses
-/// CylinderVertexLayout (position + normal, 6 floats/vertex). Built once and
-/// shared across all bond instances.
+/// A 4-vertex quad (6 indices). Each vertex carries (endpoint_sel, corner_sign)
+/// per CylinderBillboardLayout; the vertex shader expands it around the bond
+/// using the per-instance start/end/radius. Built once, shared by all bonds.
 ///
-/// \param segments Radial divisions (>= 3).
-/// \returns Unit-cylinder mesh.
-/// \throws GeometryError if segments < 3.
-MeshBuffer build_unit_cylinder(int segments = 16);
+/// \returns A MeshBuffer of 4 vertices (2 floats each) and 6 indices.
+MeshBuffer build_cylinder_billboard();
 
 /// \brief Pack half-bond records into a per-instance float buffer.
 ///

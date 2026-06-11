@@ -22,4 +22,16 @@ struct CylinderInstanceLayout {
     static constexpr int COLOR_OFFSET = 7;   ///< floats (rgba, 4 floats)
 };
 
+/// \brief Base billboard vertex for the cylinder imposter: 2 floats.
+///
+/// endpoint_sel: +1 anchors the billboard at the bond start (p1), -1 at the
+/// end (p2). corner_sign: +1 / -1 selects which lateral direction the vertex
+/// shader pushes the corner by the bond radius. Four vertices (the 4 (sel,sign)
+/// combinations) form the screen-facing quad the fragment shader ray-traces.
+struct CylinderBillboardLayout {
+    static constexpr int FLOATS_PER_VERTEX = 2;
+    static constexpr int ENDPOINT_SEL_OFFSET = 0;  ///< floats (+1 = p1, -1 = p2)
+    static constexpr int CORNER_SIGN_OFFSET = 1;    ///< floats (+1 / -1)
+};
+
 }  // namespace oe3dmol
