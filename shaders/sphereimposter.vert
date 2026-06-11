@@ -31,8 +31,13 @@ void main() {
     vec4 adjust = ubo.projectionMatrix * vec4(normal, 0.0);
     adjust.z = 0.0;
     adjust.w = 0.0;
-    vec4 lDirection = ubo.viewMatrix * vec4(ubo.directionalLightDirection.xyz, 0.0);
-    vLight = normalize(lDirection.xyz);
+    // View-space headlight. The imposter's surface normals are reconstructed in
+    // view space and always face the camera, so the light must be fixed relative
+    // to the camera too -- otherwise orbiting swings the light behind the
+    // camera-facing surface and the molecule goes black (max(dot,0) == 0) at 180
+    // degrees. Use the light direction directly in view space rather than
+    // rotating it by the view matrix (which would make it world-fixed).
+    vLight = normalize(ubo.directionalLightDirection.xyz);
     mapping = normal.xy;
     rval = abs(normal.x);
     gl_Position = projPosition + adjust;

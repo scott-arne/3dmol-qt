@@ -381,6 +381,73 @@ TEST(SceneRendererTest, OrbitChangesRenderedImage) {
     EXPECT_GT(diff, 5);
 }
 
+TEST(SceneRendererTest, SphereStaysLitAfter180Orbit) {
+    // Imposter normals are reconstructed in view space and always face the
+    // camera, so the directional light must be a view-space HEADLIGHT (fixed
+    // relative to the camera). If it is instead rotated by the view matrix
+    // (world-fixed), orbiting 180 degrees flips the light behind the
+    // camera-facing surface and the whole molecule renders black. A sphere
+    // centered on the orbit target occupies the same center pixels at every
+    // orbit angle, so its center brightness must not collapse when we spin
+    // around.
+    const QSize sz(128, 128);
+    AtomData atoms;
+    atoms.add(QVector3D(0, 0, 0), 1.0f, Color(220, 220, 220), 0u);
+    BondData bonds;
+
+    auto center_lum = [&](const Camera& cam) {
+        RhiContext ctx(sz);
+        SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+        renderer.set_geometry(atoms, bonds);
+        QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+            renderer.draw(cb, cam, sz);
+        });
+        EXPECT_FALSE(img.isNull());
+        return img.pixelColor(64, 64).red();
+    };
+
+    Camera cam0;
+    cam0.zoom_to(atoms.bounds);
+    Camera cam180;
+    cam180.zoom_to(atoms.bounds);
+    cam180.orbit(QQuaternion::fromAxisAndAngle(QVector3D(0, 1, 0), 180.0f));
+
+    EXPECT_GT(center_lum(cam0), 60) << "sphere should be lit at orbit 0";
+    EXPECT_GT(center_lum(cam180), 60)
+        << "sphere went dark after a 180-degree orbit (light is not a headlight)";
+}
+
+TEST(SceneRendererTest, StickStaysLitAfter180Orbit) {
+    // Same headlight invariant for the cylinder imposter. A stick through the
+    // orbit target still crosses screen-center after any orbit, so the center
+    // pixel stays on the cylinder body; its brightness must not collapse at 180.
+    const QSize sz(128, 128);
+    AtomData atoms;  // sticks only
+    BondData bonds;
+    bonds.add(QVector3D(-1, 0, 0), QVector3D(1, 0, 0), 0.4f, Color(0, 220, 0), 0u);
+
+    auto center_green = [&](const Camera& cam) {
+        RhiContext ctx(sz);
+        SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+        renderer.set_geometry(atoms, bonds);
+        QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+            renderer.draw(cb, cam, sz);
+        });
+        EXPECT_FALSE(img.isNull());
+        return img.pixelColor(64, 64).green();
+    };
+
+    Camera cam0;
+    cam0.zoom_to(bonds.bounds);
+    Camera cam180;
+    cam180.zoom_to(bonds.bounds);
+    cam180.orbit(QQuaternion::fromAxisAndAngle(QVector3D(0, 1, 0), 180.0f));
+
+    EXPECT_GT(center_green(cam0), 40) << "stick should be lit at orbit 0";
+    EXPECT_GT(center_green(cam180), 40)
+        << "stick went dark after a 180-degree orbit (light is not a headlight)";
+}
+
 TEST(SceneRendererTest, RendersStickSceneNonEmpty) {
     const QSize sz(128, 128);
     RhiContext ctx(sz);
