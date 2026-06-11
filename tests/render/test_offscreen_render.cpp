@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdlib>
+
 #include "oe3dmol/rhi_context.h"
 #include "oe3dmol/render_errors.h"
 #include "oe3dmol/sphere_imposter_pipeline.h"
@@ -560,7 +562,7 @@ TEST(SceneRendererTest, BentBondJointHasNoHoleAndNoSeam) {
     });
     ASSERT_FALSE(img.isNull());
 
-    // Project vertex B to screen and inspect a disk around it. Within the bond
+    // Project vertex B to screen and inspect a square around it. Within the bond
     // region near B there must be NO background-black hole (the imposter caps
     // fill it), and the grey values must be continuous (no sharp seam step).
     QVector3D bview = cam.view_matrix().map(b);
@@ -582,6 +584,40 @@ TEST(SceneRendererTest, BentBondJointHasNoHoleAndNoSeam) {
     }
     EXPECT_GT(grey_px, 0) << "joint region empty";
     EXPECT_EQ(black_px, 0) << "background hole at the bond joint (caps not filling)";
+
+    // Seam-continuity check: scan a horizontal line through the joint (row y=by)
+    // and measure the largest green-channel step between ADJACENT on-surface
+    // pixels. The molecule is flat grey under one-sided Lambert shading, so the
+    // rendered grey varies smoothly across a seamless imposter. A visible seam
+    // (a separate sphere capping the stick) would show up as a sudden step of
+    // tens of levels where the body meets the cap. Only consider pixel pairs
+    // where BOTH pixels are on the surface (green >= 25) so the legitimate
+    // step down to the black background (covered by the hole test above) is
+    // excluded.
+    int max_adjacent_delta = 0;
+    int prev_green = -1;
+    for (int x = bx - 12; x <= bx + 12; ++x) {
+        if (x < 0 || x >= sz.width() || by < 0 || by >= sz.height()) {
+            prev_green = -1;
+            continue;
+        }
+        int g = img.pixelColor(x, by).green();
+        if (g < 25) {  // background pixel: break the adjacency chain
+            prev_green = -1;
+            continue;
+        }
+        if (prev_green >= 0) {
+            int delta = std::abs(g - prev_green);
+            if (delta > max_adjacent_delta) max_adjacent_delta = delta;
+        }
+        prev_green = g;
+    }
+    // Observed seamless max-adjacent-delta on Metal: 1 (greens vary smoothly
+    // 141..144 across the joint). Threshold 20 tolerates smooth Lambert
+    // variation + anti-aliasing while catching a real seam (a sudden
+    // ~tens-of-levels shading step at a body->cap boundary).
+    EXPECT_LT(max_adjacent_delta, 20)
+        << "shading discontinuity (seam) at joint: " << max_adjacent_delta;
 }
 
 }  // namespace test

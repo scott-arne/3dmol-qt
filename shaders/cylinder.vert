@@ -61,7 +61,13 @@ void main() {
     // bond axis, matching the frag-shader ray setup.
     vec3 rdir = isperspective ? normalize(anchor) : vec3(0.0, 0.0, -1.0);
     vec3 axisDir = normalize(axis);
-    vec3 lateral = normalize(cross(rdir, axisDir));
+    vec3 latCross = cross(rdir, axisDir);
+    // When the bond points straight at the camera, rdir ∥ axisDir and the cross
+    // product vanishes; fall back to an arbitrary axis-perpendicular so the
+    // billboard still covers the end-on circular silhouette instead of collapsing.
+    vec3 lateral = (dot(latCross, latCross) < 1e-12)
+        ? normalize(cross(axisDir, vec3(0.0, 1.0, 0.0)) + cross(axisDir, vec3(1.0, 0.0, 0.0)))
+        : normalize(latCross);
 
     // Outward sign along the axis: -1 at p1, +1 at p2. Lateral sign combines the
     // corner sign with the endpoint so vertices 0,1,2,3 trace the rectangle
