@@ -132,7 +132,7 @@ TEST(CylinderPipelineTest, DrawsHorizontalBond) {
 
     BondData bonds;
     bonds.add(QVector3D(-1, 0, 0), QVector3D(1, 0, 0), 0.25f, Color(255, 0, 0), 0u);
-    MeshBuffer unit = build_cylinder_billboard();
+    MeshBuffer bb = build_cylinder_billboard();
     std::vector<float> inst = build_cylinder_instances(bonds);
 
     Camera cam;
@@ -146,7 +146,7 @@ TEST(CylinderPipelineTest, DrawsHorizontalBond) {
 
     QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
         QRhiResourceUpdateBatch* batch = ctx.rhi()->nextResourceUpdateBatch();
-        pipeline.upload(unit, inst, batch);
+        pipeline.upload(bb, inst, batch);
         pipeline.set_uniforms(u, batch);
         cb->resourceUpdate(batch);
         pipeline.draw(cb, sz);
@@ -164,13 +164,13 @@ TEST(CylinderPipelineTest, DrawsHorizontalBond) {
 TEST(CylinderPipelineTest, ZeroInstancesIsSafeNoOp) {
     const QSize sz(64, 64);
     RhiContext ctx(sz);
-    MeshBuffer unit = build_cylinder_billboard();
+    MeshBuffer bb = build_cylinder_billboard();
     std::vector<float> inst;  // empty
     CylinderPipeline pipeline(ctx.rhi(), ctx.render_pass_descriptor());
     ImposterUniforms u;
     QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
         QRhiResourceUpdateBatch* batch = ctx.rhi()->nextResourceUpdateBatch();
-        pipeline.upload(unit, inst, batch);
+        pipeline.upload(bb, inst, batch);
         pipeline.set_uniforms(u, batch);
         cb->resourceUpdate(batch);
         pipeline.draw(cb, sz);
@@ -189,7 +189,7 @@ TEST(CylinderPipelineTest, TwoBondsRenderDistinctPerInstanceColors) {
     BondData bonds;
     bonds.add(QVector3D(-1, 2, 0), QVector3D(1, 2, 0), 0.3f, Color(255, 0, 0), 0u);
     bonds.add(QVector3D(-1, -2, 0), QVector3D(1, -2, 0), 0.3f, Color(0, 0, 255), 1u);
-    MeshBuffer unit = build_cylinder_billboard();
+    MeshBuffer bb = build_cylinder_billboard();
     std::vector<float> inst = build_cylinder_instances(bonds);
     ASSERT_EQ(inst.size(), 22u);  // 2 instances * 11 floats
 
@@ -204,7 +204,7 @@ TEST(CylinderPipelineTest, TwoBondsRenderDistinctPerInstanceColors) {
 
     QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
         QRhiResourceUpdateBatch* batch = ctx.rhi()->nextResourceUpdateBatch();
-        pipeline.upload(unit, inst, batch);
+        pipeline.upload(bb, inst, batch);
         pipeline.set_uniforms(u, batch);
         cb->resourceUpdate(batch);
         pipeline.draw(cb, sz);
