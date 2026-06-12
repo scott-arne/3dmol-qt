@@ -33,6 +33,9 @@ void SceneRenderer::draw(QRhiCommandBuffer* cb, const Camera& camera, const QSiz
             ? static_cast<float>(viewport.width()) / static_cast<float>(viewport.height())
             : 1.0f);
     u.model_view = u.view;
+    // Map GL-convention clip space (z in [-1,1]) into the backend's clip volume
+    // so the hardware clipper does not discard the front half of the frustum.
+    u.clip_correction = rhi_->clipSpaceCorrMatrix();
 
     QRhiResourceUpdateBatch* batch = rhi_->nextResourceUpdateBatch();
     if (geometry_dirty_) {

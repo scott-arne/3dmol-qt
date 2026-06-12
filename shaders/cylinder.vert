@@ -13,6 +13,7 @@ layout(std140, binding = 0) uniform Ubo {
     mat4 modelViewMatrix;
     mat4 projectionMatrix;
     mat4 viewMatrix;
+    mat4 clipCorrection;
     vec4 directionalLightColor;
     vec4 directionalLightDirection;
     vec4 fogColor;
@@ -81,7 +82,9 @@ void main() {
     mvPosition.xyz += lateralSign * lateral * (instRadius * slop);
 
     vCpos = mvPosition.xyz;
-    gl_Position = ubo.projectionMatrix * vec4(mvPosition.xyz, 1.0);
+    // clipCorrection maps GL clip space into the backend's clip volume so the
+    // hardware clipper keeps the front half of the frustum (z < 0 in GL terms).
+    gl_Position = ubo.clipCorrection * ubo.projectionMatrix * vec4(mvPosition.xyz, 1.0);
 
     // View-space headlight. The imposter's surface normals are reconstructed in
     // view space and always face the camera, so the light must be fixed relative

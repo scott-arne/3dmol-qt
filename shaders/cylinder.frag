@@ -4,6 +4,7 @@ layout(std140, binding = 0) uniform Ubo {
     mat4 modelViewMatrix;
     mat4 projectionMatrix;
     mat4 viewMatrix;
+    mat4 clipCorrection;
     vec4 directionalLightColor;
     vec4 directionalLightDirection;
     vec4 fogColor;

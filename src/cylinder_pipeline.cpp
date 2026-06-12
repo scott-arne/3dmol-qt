@@ -35,9 +35,9 @@ QShader load_shader(const QString& path) {
     return s;
 }
 
-// std140 size: 3 mat4 (192) + 3 vec4 (48) + 4 floats (16) = 256 bytes.
+// std140 size: 4 mat4 (256) + 3 vec4 (48) + 4 floats (16) = 320 bytes.
 // Matches the shared ImposterUniforms layout consumed by the cylinder shaders.
-constexpr quint32 UBO_SIZE = 256;
+constexpr quint32 UBO_SIZE = 320;
 
 void pack_uniforms(const ImposterUniforms& u, float* out) {
     int o = 0;
@@ -48,6 +48,7 @@ void pack_uniforms(const ImposterUniforms& u, float* out) {
     put_mat(u.model_view);
     put_mat(u.projection);
     put_mat(u.view);
+    put_mat(u.clip_correction);
     auto put_vec4 = [&](const QVector3D& v) {
         out[o++] = v.x();
         out[o++] = v.y();

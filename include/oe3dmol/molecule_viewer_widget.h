@@ -48,6 +48,16 @@ public:
     /// \brief Background color (default white).
     void set_background_color(const QColor& color);
 
+    /// \brief Fit and center the camera on the current scene, resetting the
+    /// orientation and the near/far clip planes so a full orbit never clips.
+    ///
+    /// This is the routine "frame the molecule" action: it recomputes the scene
+    /// bounds from the current models/styles and re-frames the camera (the same
+    /// fit applied automatically when the first model is added). Bound to the
+    /// 'R' key in the interactive viewer, and callable directly. No-op until a
+    /// model with valid bounds has been added.
+    void zoom_to();
+
 protected:
     void initialize(QRhiCommandBuffer* cb) override;
     void render(QRhiCommandBuffer* cb) override;
@@ -56,6 +66,7 @@ protected:
     void mousePressEvent(QMouseEvent* e) override;
     void mouseMoveEvent(QMouseEvent* e) override;
     void wheelEvent(QWheelEvent* e) override;
+    void keyPressEvent(QKeyEvent* e) override;
 
 private:
     void rebuild_geometry();  // models -> AtomData/BondData -> camera fit
@@ -68,6 +79,7 @@ private:
     Camera camera_;
     AtomData atoms_;
     BondData bonds_;
+    BoundingBox last_bounds_;  // most recent scene bounds, for zoom_to()
     bool camera_initialized_ = false;
 
     QPoint last_pos_;

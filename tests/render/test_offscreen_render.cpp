@@ -687,5 +687,41 @@ TEST(SceneRendererTest, BentBondJointHasNoHoleAndNoSeam) {
         << "shading discontinuity (seam) at joint: " << max_adjacent_delta;
 }
 
+
+TEST(SceneRendererTest, FrontHalfGeometryIsNotClipped) {
+    // Regression for the front-clipping bug: gl_Position must be mapped into the
+    // backend's clip volume via QRhi::clipSpaceCorrMatrix(). We feed an OpenGL-
+    // convention projection (clip z in [-1,1]); Metal/D3D/Vulkan clip at z<0, so
+    // WITHOUT the correction the entire front half of the frustum is discarded
+    // and geometry that orbits toward the camera vanishes.
+    //
+    // Frame a box centered at the origin, then place a RED sphere toward the
+    // camera (+Z). With bounds spanning z in [-4,4] and a 45-degree fovy, the
+    // sphere at z=+3 sits at view depth ~8.1 (near ~6.6, distance ~11.1), i.e.
+    // the front half where GL-convention ndc z is negative -> clipped by the bug.
+    // It projects to screen center and must render.
+    const QSize sz(128, 128);
+    RhiContext ctx(sz);
+    AtomData atoms;
+    atoms.add(QVector3D(0, 0, 3.0f), 1.0f, Color(255, 0, 0), 0u);  // front, toward camera
+    BondData bonds;
+    BoundingBox bounds;
+    bounds.include(QVector3D(0, 0, 3.0f), 1.0f);
+    bounds.include(QVector3D(0, 0, -3.0f), 1.0f);  // counterweight: center ~ origin
+
+    SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+    renderer.set_geometry(atoms, bonds);
+    Camera cam; cam.zoom_to(bounds);
+
+    QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+        renderer.draw(cb, cam, sz);
+    });
+    ASSERT_FALSE(img.isNull());
+    QColor center = img.pixelColor(64, 64);
+    EXPECT_GT(center.red(), 80)
+        << "front-half sphere was clipped (missing clip-space correction)";
+}
+
+
 }  // namespace test
 }  // namespace oe3dmol

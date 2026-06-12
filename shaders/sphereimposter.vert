@@ -8,6 +8,7 @@ layout(std140, binding = 0) uniform Ubo {
     mat4 modelViewMatrix;
     mat4 projectionMatrix;
     mat4 viewMatrix;
+    mat4 clipCorrection;
     vec4 directionalLightColor;      // xyz used
     vec4 directionalLightDirection;  // xyz used
     vec4 fogColor;                   // xyz used
@@ -40,5 +41,7 @@ void main() {
     vLight = normalize(ubo.directionalLightDirection.xyz);
     mapping = normal.xy;
     rval = abs(normal.x);
-    gl_Position = projPosition + adjust;
+    // clipCorrection maps GL clip space into the backend's clip volume so the
+    // hardware clipper keeps the front half of the frustum (z < 0 in GL terms).
+    gl_Position = ubo.clipCorrection * (projPosition + adjust);
 }

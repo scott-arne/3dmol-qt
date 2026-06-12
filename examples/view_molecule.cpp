@@ -120,12 +120,15 @@ int main(int argc, char** argv) {
     auto* toolbar = new QHBoxLayout;
     toolbar->setContentsMargins(6, 4, 6, 4);
     auto* label = new QLabel(QStringLiteral("Representation:"));
+    // Hint the re-frame shortcut so the fit/center action is discoverable.
+    auto* hint = new QLabel(QStringLiteral("  (press R to re-fit)"));
     auto* combo = new QComboBox;
     combo->addItem(QStringLiteral("Sphere"));
     combo->addItem(QStringLiteral("Ball-and-stick"));
     combo->addItem(QStringLiteral("Sticks"));
     toolbar->addWidget(label);
     toolbar->addWidget(combo);
+    toolbar->addWidget(hint);
     toolbar->addStretch(1);
 
     // The layout takes ownership of the viewer once added below.

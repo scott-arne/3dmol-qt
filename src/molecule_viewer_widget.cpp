@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QWheelEvent>
 
@@ -15,7 +16,11 @@
 
 namespace oe3dmol {
 
-MoleculeViewerWidget::MoleculeViewerWidget(QWidget* parent) : QRhiWidget(parent) {}
+MoleculeViewerWidget::MoleculeViewerWidget(QWidget* parent) : QRhiWidget(parent) {
+    // Accept keyboard focus (click or tab) so key shortcuts like 'R' (re-frame)
+    // are delivered to the widget.
+    setFocusPolicy(Qt::StrongFocus);
+}
 
 MoleculeViewerWidget::~MoleculeViewerWidget() = default;
 
@@ -54,9 +59,23 @@ void MoleculeViewerWidget::set_background_color(const QColor& color) {
 void MoleculeViewerWidget::rebuild_geometry() {
     BoundingBox scene_bounds;
     build_scene(models_, atoms_, bonds_, scene_bounds);
+    last_bounds_ = scene_bounds;
+    // Auto-fit only the first time a valid scene appears; explicit zoom_to()
+    // (or the 'R' key) re-frames afterward without fighting user navigation.
     if (!camera_initialized_ && scene_bounds.valid()) {
         camera_.zoom_to(scene_bounds);
         camera_initialized_ = true;
+    }
+}
+
+void MoleculeViewerWidget::zoom_to() {
+    // Re-frame the camera on the current scene: recenters, resets orientation,
+    // and re-derives the clip planes (Camera::zoom_to) so a full orbit from the
+    // framed pose never clips. No-op until the scene has valid bounds.
+    if (last_bounds_.valid()) {
+        camera_.zoom_to(last_bounds_);
+        camera_initialized_ = true;
+        update();
     }
 }
 
@@ -109,6 +128,15 @@ void MoleculeViewerWidget::mouseMoveEvent(QMouseEvent* e) {
         update();
     }
     last_pos_ = pos;
+}
+
+void MoleculeViewerWidget::keyPressEvent(QKeyEvent* e) {
+    // 'R' re-frames the molecule (fit + center + reset clip planes).
+    if (e->key() == Qt::Key_R) {
+        zoom_to();
+        return;
+    }
+    QRhiWidget::keyPressEvent(e);
 }
 
 void MoleculeViewerWidget::wheelEvent(QWheelEvent* e) {
