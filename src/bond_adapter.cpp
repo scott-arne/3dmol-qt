@@ -36,6 +36,23 @@ void add_line(BondData& data, const QVector3D& a, const QVector3D& b, float radi
     data.add(b, mid, radius, color_b, bond_index);
 }
 
+// Multi-bond geometry (in units of the stick radius; tuned visually on benzene).
+constexpr float OFFSET_FACTOR = 2.5f;         // double / aromatic side offset
+constexpr float TRIPLE_OFFSET_FACTOR = 3.0f;  // outer offset for triples
+
+// Position of any atom bonded to `atom` other than `exclude`, written to `out`.
+// Returns false if `atom` has no such neighbor.
+bool first_other_neighbor(const OEChem::OEMolBase* mol, const OEChem::OEAtomBase* atom,
+                          const OEChem::OEAtomBase* exclude, QVector3D& out) {
+    for (OESystem::OEIter nbr = atom->GetAtoms(); nbr; ++nbr) {
+        const OEChem::OEAtomBase& n = *nbr;
+        if (&n == exclude) continue;
+        out = atom_pos(mol, &n);
+        return true;
+    }
+    return false;
+}
+
 }  // namespace
 
 QVector3D bond_offset_dir(const QVector3D& axis, const QVector3D& ref) {
@@ -60,7 +77,7 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
     }
 
     BondData data;
-    data.reserve(static_cast<std::size_t>(mol->NumBonds()) * 2);
+    data.reserve(static_cast<std::size_t>(mol->NumBonds()) * 6);
     const float radius = static_cast<float>(style.radius());
 
     for (OESystem::OEIter bond = mol->GetBonds(); bond; ++bond) {
@@ -85,7 +102,40 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
         const Color c_end = atom_color(style.color(), aend, style.opacity());
         const unsigned idx = b.GetIdx();
 
-        add_line(data, p_bgn, p_end, radius, c_bgn, c_end, idx);
+        const unsigned order = b.GetOrder();
+        const bool aromatic = b.IsAromatic();
+
+        if (style.single_bonds() || (order <= 1 && !aromatic)) {
+            add_line(data, p_bgn, p_end, radius, c_bgn, c_end, idx);
+            continue;
+        }
+
+        // Offset direction: perpendicular to the bond, toward a neighbor atom so
+        // the extra lines lie in the molecular plane / ring interior.
+        QVector3D ref;
+        if (!first_other_neighbor(mol, abgn, aend, ref) &&
+            !first_other_neighbor(mol, aend, abgn, ref)) {
+            ref = p_bgn + QVector3D(0, 1, 0);  // arbitrary; bond_offset_dir falls back
+        }
+        const QVector3D off = bond_offset_dir(p_end - p_bgn, ref - p_bgn);
+
+        if (aromatic) {
+            // Handled in Task 5; for now render as a plain single line so this task
+            // stays focused on explicit order. (Replaced in Task 5.)
+            add_line(data, p_bgn, p_end, radius, c_bgn, c_end, idx);
+            continue;
+        }
+
+        if (order == 2) {
+            const QVector3D d = off * (OFFSET_FACTOR * radius);
+            add_line(data, p_bgn + d, p_end + d, radius, c_bgn, c_end, idx);
+            add_line(data, p_bgn - d, p_end - d, radius, c_bgn, c_end, idx);
+        } else {  // order >= 3: triple (defensive: treat >3 as triple)
+            const QVector3D d = off * (TRIPLE_OFFSET_FACTOR * radius);
+            add_line(data, p_bgn, p_end, radius, c_bgn, c_end, idx);
+            add_line(data, p_bgn + d, p_end + d, radius, c_bgn, c_end, idx);
+            add_line(data, p_bgn - d, p_end - d, radius, c_bgn, c_end, idx);
+        }
     }
 
     return data;

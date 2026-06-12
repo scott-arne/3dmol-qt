@@ -5,6 +5,8 @@
 #include "oe3dmol/color_schemes.h"
 
 #include <oechem.h>
+#include <vector>
+#include <cmath>
 
 namespace oe3dmol {
 namespace test {
@@ -170,6 +172,92 @@ TEST(BondOffsetDirTest, CollinearNeighborFallsBackToValidPerpendicular) {
     QVector3D d = bond_offset_dir(axis, ref);
     EXPECT_NEAR(d.length(), 1.0f, 1e-4f);          // still unit (fallback used)
     EXPECT_NEAR(QVector3D::dotProduct(d, axis), 0.0f, 1e-4f);  // still perpendicular
+}
+
+TEST(BondAdapterTest, DoubleBondYieldsTwoParallelLines) {
+    // C=O double bond, with a neighbor on carbon so the offset plane is defined.
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* c = mol.NewAtom(6);
+    OEChem::OEAtomBase* o = mol.NewAtom(8);
+    OEChem::OEAtomBase* h = mol.NewAtom(1);  // neighbor on carbon
+    double pc[3] = {0, 0, 0};
+    double po[3] = {1.2, 0, 0};
+    double ph[3] = {-0.5, 1.0, 0};  // off-axis -> defines the plane
+    mol.SetCoords(c, pc); mol.SetCoords(o, po); mol.SetCoords(h, ph);
+    mol.NewBond(c, o, 2);  // double
+    mol.NewBond(c, h, 1);
+
+    StickStyle style;  // single_bonds defaults false
+    BondData b = build_bond_data(as_base(mol), style);
+    // double C=O -> 2 lines * 2 halves = 4; single C-H -> 2. Total 6.
+    EXPECT_EQ(b.size(), 6u);
+
+    // The two C=O lines must be offset in OPPOSITE perpendicular directions:
+    // collect the C-side half-bond starts for bond index 0 and check they differ
+    // and are symmetric about the original carbon position (0,0,0).
+    std::vector<QVector3D> co_starts;
+    for (std::size_t i = 0; i < b.size(); ++i)
+        if (b.source_bond_idx[i] == 0u &&
+            (b.starts[i] - QVector3D(0, 0, 0)).length() < 0.7f)  // carbon-side halves
+            co_starts.push_back(b.starts[i]);
+    ASSERT_EQ(co_starts.size(), 2u);
+    // Symmetric about the carbon center: midpoint of the two offset starts ~ (0,0,0).
+    QVector3D mid = (co_starts[0] + co_starts[1]) * 0.5f;
+    EXPECT_NEAR(mid.x(), 0.0f, 1e-3f);
+    EXPECT_NEAR(mid.y(), 0.0f, 1e-3f);
+    EXPECT_NEAR(mid.z(), 0.0f, 1e-3f);
+    // Offset is perpendicular to the bond axis (x): the two starts share x, differ in y.
+    EXPECT_NEAR(co_starts[0].x(), co_starts[1].x(), 1e-3f);
+    EXPECT_GT((co_starts[0] - co_starts[1]).length(), 1e-2f);
+}
+
+TEST(BondAdapterTest, TripleBondYieldsThreeLines) {
+    // C#C triple with neighbors so the plane is defined.
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* c1 = mol.NewAtom(6);
+    OEChem::OEAtomBase* c2 = mol.NewAtom(6);
+    OEChem::OEAtomBase* h = mol.NewAtom(1);
+    double p1[3] = {0, 0, 0};
+    double p2[3] = {1.2, 0, 0};
+    double ph[3] = {-0.5, 1.0, 0};
+    mol.SetCoords(c1, p1); mol.SetCoords(c2, p2); mol.SetCoords(h, ph);
+    mol.NewBond(c1, c2, 3);  // triple
+    mol.NewBond(c1, h, 1);
+
+    StickStyle style;
+    BondData b = build_bond_data(as_base(mol), style);
+    // triple -> 3 lines * 2 = 6; single C-H -> 2. Total 8.
+    EXPECT_EQ(b.size(), 8u);
+}
+
+TEST(BondAdapterTest, SingleBondsTrueCollapsesMultiplicity) {
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* c = mol.NewAtom(6);
+    OEChem::OEAtomBase* o = mol.NewAtom(8);
+    double pc[3] = {0, 0, 0};
+    double po[3] = {1.2, 0, 0};
+    mol.SetCoords(c, pc); mol.SetCoords(o, po);
+    mol.NewBond(c, o, 2);  // double
+
+    StickStyle style;
+    style.single_bonds(true);  // force plain sticks
+    BondData b = build_bond_data(as_base(mol), style);
+    EXPECT_EQ(b.size(), 2u);  // collapsed to a single line
+}
+
+TEST(BondAdapterTest, DoubleBondWithNoNeighborStillRenders) {
+    // Isolated diatomic double bond: no neighbor -> fallback perpendicular.
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* c = mol.NewAtom(6);
+    OEChem::OEAtomBase* o = mol.NewAtom(8);
+    double pc[3] = {0, 0, 0};
+    double po[3] = {1.2, 0, 0};
+    mol.SetCoords(c, pc); mol.SetCoords(o, po);
+    mol.NewBond(c, o, 2);
+
+    StickStyle style;
+    BondData b = build_bond_data(as_base(mol), style);
+    EXPECT_EQ(b.size(), 4u);  // still two parallel lines, no crash
 }
 
 }  // namespace test
