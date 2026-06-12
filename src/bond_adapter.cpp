@@ -26,6 +26,16 @@ Color atom_color(ColorScheme scheme, const OEChem::OEAtomBase* atom, double opac
     return c;
 }
 
+// Emit one rendered cylinder line from `a` to `b` as two half-bonds split at the
+// line's midpoint, each half taking its near-end color. Shared by every bond
+// multiplicity so coloring/splitting logic lives in one place.
+void add_line(BondData& data, const QVector3D& a, const QVector3D& b, float radius,
+              const Color& color_a, const Color& color_b, unsigned bond_index) {
+    const QVector3D mid = (a + b) * 0.5f;
+    data.add(a, mid, radius, color_a, bond_index);
+    data.add(b, mid, radius, color_b, bond_index);
+}
+
 }  // namespace
 
 BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) {
@@ -54,14 +64,12 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
         if ((p_end - p_bgn).lengthSquared() < MIN_BOND_LENGTH_SQ) {
             continue;
         }
-        const QVector3D mid = (p_bgn + p_end) * 0.5f;
 
         const Color c_bgn = atom_color(style.color(), abgn, style.opacity());
         const Color c_end = atom_color(style.color(), aend, style.opacity());
-
         const unsigned idx = b.GetIdx();
-        data.add(p_bgn, mid, radius, c_bgn, idx);
-        data.add(p_end, mid, radius, c_end, idx);
+
+        add_line(data, p_bgn, p_end, radius, c_bgn, c_end, idx);
     }
 
     return data;
