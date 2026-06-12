@@ -781,5 +781,87 @@ TEST(CylinderPipelineTest, TiltedBondCapStaysRounded) {
 
 
 
+TEST(BondOrderRenderTest, DoubleBondShowsTwoSeparatedCylinders) {
+    // A single double bond between two atoms, plus a neighbor so the offset plane
+    // is in-screen. Camera looks down -Z; bond along X, offset along Y.
+    const QSize sz(256, 256);
+    RhiContext ctx(sz);
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* c = mol.NewAtom(6);
+    OEChem::OEAtomBase* o = mol.NewAtom(8);
+    OEChem::OEAtomBase* h = mol.NewAtom(1);
+    double pc[3] = {-0.6, 0, 0};
+    double po[3] = {0.6, 0, 0};
+    double ph[3] = {-1.2, 0.6, 0};  // neighbor in +y so offset is vertical on screen
+    mol.SetCoords(c, pc); mol.SetCoords(o, po); mol.SetCoords(h, ph);
+    mol.NewBond(c, o, 2);
+    mol.NewBond(c, h, 1);
+    const OEChem::OEMolBase& base = mol;
+
+    BondData bonds = build_bond_data(&base, StickStyle{}.radius(0.08));
+    AtomData none;
+    SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+    renderer.set_geometry(none, bonds);
+    Camera cam; cam.zoom_to(bonds.bounds);
+    QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+        renderer.draw(cb, cam, sz);
+    });
+    ASSERT_FALSE(img.isNull());
+
+    // Scan a vertical line through the bond center (x = width/2). The two parallel
+    // cylinders appear as two filled bands separated by a background gap.
+    const int x = sz.width() / 2;
+    int bands = 0;
+    bool prev_filled = false;
+    for (int y = 0; y < sz.height(); ++y) {
+        QColor c2 = img.pixelColor(x, y);
+        const bool filled = (c2.red() + c2.green() + c2.blue()) > 60;  // not black bg
+        if (filled && !prev_filled) ++bands;
+        prev_filled = filled;
+    }
+    EXPECT_GE(bands, 2) << "double bond should show two separated cylinders (bands="
+                        << bands << ")";
+}
+
+TEST(BondOrderRenderTest, AromaticRingShowsInnerLinesWhenFlagged) {
+    // Benzene's ring bonds are aromatic (OEReadMolecule perceives aromaticity in
+    // this OE version; OEAssignAromaticFlags below is a harmless no-op here but
+    // keeps the test correct for inputs that arrive un-perceived). The aromatic
+    // render must draw MORE bond pixels than a forced-single render because the
+    // inner ring lines add pixels.
+    OEChem::oemolistream ims;
+    ASSERT_TRUE(ims.open("/tmp/benzene.sdf")) << "benzene fixture missing";
+    OEChem::OEGraphMol mol;
+    ASSERT_TRUE(OEChem::OEReadMolecule(ims, mol));
+    OEChem::OEAssignAromaticFlags(mol);  // test-only perception
+    const OEChem::OEMolBase& base = mol;
+
+    const QSize sz(400, 400);
+    auto bond_pixels = [&](const StickStyle& style) {
+        RhiContext ctx(sz);
+        BondData bonds = build_bond_data(&base, style);
+        AtomData none;
+        SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+        renderer.set_geometry(none, bonds);
+        Camera cam; cam.zoom_to(bonds.bounds);
+        QImage img = ctx.render_frame(QColor(255, 255, 255), [&](QRhiCommandBuffer* cb) {
+            renderer.draw(cb, cam, sz);
+        });
+        EXPECT_FALSE(img.isNull());
+        int n = 0;
+        for (int y = 0; y < sz.height(); ++y)
+            for (int xx = 0; xx < sz.width(); ++xx) {
+                QColor c = img.pixelColor(xx, y);
+                if (c.red() < 230 || c.green() < 230 || c.blue() < 230) ++n;  // non-bg
+            }
+        return n;
+    };
+    const int aromatic_px = bond_pixels(StickStyle{});                   // inner lines on
+    const int single_px = bond_pixels(StickStyle{}.single_bonds(true));  // forced single
+    EXPECT_GT(aromatic_px, single_px)
+        << "aromatic inner lines should add bond pixels (aromatic=" << aromatic_px
+        << " single=" << single_px << ")";
+}
+
 }  // namespace test
 }  // namespace oe3dmol
