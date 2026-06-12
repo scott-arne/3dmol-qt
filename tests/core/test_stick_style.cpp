@@ -23,5 +23,13 @@ TEST(StickStyleTest, FluentSettersChain) {
     EXPECT_DOUBLE_EQ(s.opacity(), 0.5);
 }
 
+TEST(StickStyleTest, SingleBondsDefaultsFalseAndIsChainable) {
+    StickStyle s;
+    EXPECT_FALSE(s.single_bonds());          // multiplicity/aromaticity ON by default
+    StickStyle& ref = s.single_bonds(true);  // fluent setter returns *this
+    EXPECT_TRUE(s.single_bonds());
+    EXPECT_EQ(&ref, &s);
+}
+
 }  // namespace test
 }  // namespace oe3dmol
