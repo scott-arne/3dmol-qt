@@ -872,5 +872,57 @@ TEST(BondOrderRenderTest, AromaticRingShowsInnerLines) {
         << " single=" << single_px << ")";
 }
 
+TEST(BondOrderRenderTest, DoubleBondNotMuchWiderThanSingle) {
+    // A double bond renders as two thinner offset cylinders that together read as
+    // ~one-bond-wide (3dmol look). The earlier bug spaced two FULL-radius cylinders
+    // ~a half-bond-length apart, making the double bond ~3x the visual width of a
+    // single bond. Render the SAME C-O bond as single vs double (default style),
+    // measure the max filled height of the central column, and require the double
+    // to be no more than 1.7x the single. (3x = the bug.)
+    const QSize sz(256, 256);
+    auto bond_height = [&](int order) {
+        OEChem::OEGraphMol mol;
+        OEChem::OEAtomBase* c = mol.NewAtom(6);
+        OEChem::OEAtomBase* o = mol.NewAtom(8);
+        OEChem::OEAtomBase* h = mol.NewAtom(1);  // neighbor -> in-screen offset (+y)
+        double pc[3] = {-0.7, 0, 0}, po[3] = {0.7, 0, 0}, ph[3] = {-1.3, 0.7, 0};
+        mol.SetCoords(c, pc); mol.SetCoords(o, po); mol.SetCoords(h, ph);
+        mol.NewBond(c, o, order);
+        mol.NewBond(c, h, 1);
+        const OEChem::OEMolBase& base = mol;
+        RhiContext ctx(sz);
+        BondData bonds = build_bond_data(&base, StickStyle{});
+        AtomData none;
+        SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+        renderer.set_geometry(none, bonds);
+        Camera cam; cam.zoom_to(bonds.bounds);
+        QImage img = ctx.render_frame(QColor(255, 255, 255), [&](QRhiCommandBuffer* cb) {
+            renderer.draw(cb, cam, sz);
+        });
+        EXPECT_FALSE(img.isNull());
+        // Max filled height over the central columns (the bond runs horizontally;
+        // the C=O occupies the left-center, so scan a band of columns and take the
+        // tallest filled run to capture the full double-bond spread).
+        int max_h = 0;
+        for (int x = sz.width() / 4; x < sz.width() / 2; ++x) {
+            int h = 0;
+            for (int y = 0; y < sz.height(); ++y) {
+                QColor cc = img.pixelColor(x, y);
+                if (cc.red() < 220 || cc.green() < 220 || cc.blue() < 220) ++h;  // non-bg
+            }
+            max_h = std::max(max_h, h);
+        }
+        return max_h;
+    };
+    const int single_h = bond_height(1);
+    const int double_h = bond_height(2);
+    ASSERT_GT(single_h, 0);
+    EXPECT_GT(double_h, single_h)  // a double IS a bit wider (two offset lines)
+        << "double bond should be slightly wider than single";
+    EXPECT_LT(double_h, single_h * 17 / 10)  // ...but NOT ~3x (the bug)
+        << "double bond far too wide (double_h=" << double_h << " single_h=" << single_h << ")";
+}
+
+
 }  // namespace test
 }  // namespace oe3dmol

@@ -36,11 +36,15 @@ void add_line(BondData& data, const QVector3D& a, const QVector3D& b, float radi
     data.add(b, mid, radius, color_b, bond_index);
 }
 
-// Multi-bond geometry (in units of the stick radius; tuned visually on benzene).
-constexpr float OFFSET_FACTOR = 2.5f;         // double / aromatic side offset
-constexpr float TRIPLE_OFFSET_FACTOR = 3.0f;  // outer offset for triples
+// Multi-bond geometry (in units of the stick radius; tuned visually on benzene
+// + carbonyls). Offsets are small fractions of the radius so the parallel lines
+// of a double/triple sit close together and read as ONE bond that is split, with
+// total width close to a single stick -- not as widely separated detached bars.
+constexpr float OFFSET_FACTOR = 0.7f;         // double / aromatic side offset
+constexpr float TRIPLE_OFFSET_FACTOR = 1.1f;  // outer offset for triples
+constexpr float MULTI_RADIUS_FRAC = 0.55f;    // thinner sub-cylinders for double/triple
 constexpr float INNER_LEN_FRAC = 0.6f;        // aromatic inner line length fraction
-constexpr float INNER_RADIUS_FRAC = 0.7f;     // aromatic inner line radius fraction
+constexpr float INNER_RADIUS_FRAC = 0.5f;     // aromatic inner line radius fraction
 
 // Position of any atom bonded to `atom` other than `exclude`, written to `out`.
 // Returns false if `atom` has no such neighbor.
@@ -135,15 +139,17 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
             continue;
         }
 
+        const float sub_radius = radius * MULTI_RADIUS_FRAC;
         if (order == 2) {
+            // Two thinner cylinders offset symmetrically; together ~one bond wide.
             const QVector3D d = off * (OFFSET_FACTOR * radius);
-            add_line(data, p_bgn + d, p_end + d, radius, c_bgn, c_end, idx);
-            add_line(data, p_bgn - d, p_end - d, radius, c_bgn, c_end, idx);
+            add_line(data, p_bgn + d, p_end + d, sub_radius, c_bgn, c_end, idx);
+            add_line(data, p_bgn - d, p_end - d, sub_radius, c_bgn, c_end, idx);
         } else {  // order >= 3: triple (defensive: treat >3 as triple)
             const QVector3D d = off * (TRIPLE_OFFSET_FACTOR * radius);
-            add_line(data, p_bgn, p_end, radius, c_bgn, c_end, idx);
-            add_line(data, p_bgn + d, p_end + d, radius, c_bgn, c_end, idx);
-            add_line(data, p_bgn - d, p_end - d, radius, c_bgn, c_end, idx);
+            add_line(data, p_bgn, p_end, sub_radius, c_bgn, c_end, idx);
+            add_line(data, p_bgn + d, p_end + d, sub_radius, c_bgn, c_end, idx);
+            add_line(data, p_bgn - d, p_end - d, sub_radius, c_bgn, c_end, idx);
         }
     }
 
