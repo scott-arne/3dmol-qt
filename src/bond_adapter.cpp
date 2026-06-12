@@ -38,6 +38,22 @@ void add_line(BondData& data, const QVector3D& a, const QVector3D& b, float radi
 
 }  // namespace
 
+QVector3D bond_offset_dir(const QVector3D& axis, const QVector3D& ref) {
+    const QVector3D a = axis.normalized();
+    QVector3D perp = ref - a * QVector3D::dotProduct(ref, a);
+    constexpr float MIN_PERP_SQ = 1.0e-8f;
+    if (perp.lengthSquared() >= MIN_PERP_SQ) {
+        return perp.normalized();
+    }
+    // Collinear / no neighbor: pick any axis-perpendicular. cross with X, then Y;
+    // at least one is non-degenerate since `a` cannot be parallel to both.
+    QVector3D c = QVector3D::crossProduct(a, QVector3D(1, 0, 0));
+    if (c.lengthSquared() < MIN_PERP_SQ) {
+        c = QVector3D::crossProduct(a, QVector3D(0, 1, 0));
+    }
+    return c.normalized();
+}
+
 BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) {
     if (mol == nullptr) {
         throw DataError("build_bond_data: molecule is null");

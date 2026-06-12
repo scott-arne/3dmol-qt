@@ -6,11 +6,26 @@
 #include "oe3dmol/bond_data.h"
 #include "oe3dmol/stick_style.h"
 
+#include <QVector3D>
+
 namespace OEChem {
 class OEMolBase;
 }
 
 namespace oe3dmol {
+
+/// \brief Unit vector perpendicular to `axis`, in the plane of `axis` and `ref`,
+/// pointing toward `ref`'s perpendicular component.
+///
+/// Used to offset double/triple/aromatic bond lines into a chemically sensible
+/// plane (toward a neighbor atom). When `ref` is collinear with `axis` (or zero),
+/// falls back to an arbitrary axis-perpendicular so callers always get a valid
+/// unit vector.
+///
+/// \param axis Bond axis (need not be normalized).
+/// \param ref  Direction toward a neighbor atom, relative to a bond endpoint.
+/// \returns A unit vector perpendicular to `axis`.
+QVector3D bond_offset_dir(const QVector3D& axis, const QVector3D& ref);
 
 /// \brief Build half-bond BondData from an OpenEye molecule under a stick style.
 ///

@@ -152,5 +152,25 @@ TEST(BondAdapterTest, CoincidentAtomBondIsSkipped) {
     EXPECT_EQ(b.size(), 0u);  // degenerate bond skipped
 }
 
+TEST(BondOffsetDirTest, PerpendicularToAxisTowardNeighbor) {
+    // axis along +x; neighbor sits up and to the side. Offset must be perpendicular
+    // to the axis and point toward the neighbor's perpendicular component (+y).
+    QVector3D axis(1, 0, 0);
+    QVector3D ref(0.5f, 1.0f, 0.0f);  // neighbor relative to bond start
+    QVector3D d = bond_offset_dir(axis, ref);
+    EXPECT_NEAR(d.length(), 1.0f, 1e-4f);          // unit
+    EXPECT_NEAR(QVector3D::dotProduct(d, axis), 0.0f, 1e-4f);  // perpendicular
+    EXPECT_GT(d.y(), 0.9f);                         // points toward +y neighbor
+}
+
+TEST(BondOffsetDirTest, CollinearNeighborFallsBackToValidPerpendicular) {
+    // neighbor exactly along the axis -> perpendicular component ~0 -> fallback.
+    QVector3D axis(0, 0, 1);
+    QVector3D ref(0, 0, 5);  // collinear
+    QVector3D d = bond_offset_dir(axis, ref);
+    EXPECT_NEAR(d.length(), 1.0f, 1e-4f);          // still unit (fallback used)
+    EXPECT_NEAR(QVector3D::dotProduct(d, axis), 0.0f, 1e-4f);  // still perpendicular
+}
+
 }  // namespace test
 }  // namespace oe3dmol
