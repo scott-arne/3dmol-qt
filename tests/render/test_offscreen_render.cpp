@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdlib>
+#include <cmath>
 
 #include "oe3dmol/rhi_context.h"
 #include "oe3dmol/render_errors.h"
@@ -823,17 +824,25 @@ TEST(BondOrderRenderTest, DoubleBondShowsTwoSeparatedCylinders) {
                         << bands << ")";
 }
 
-TEST(BondOrderRenderTest, AromaticRingShowsInnerLinesWhenFlagged) {
-    // Benzene's ring bonds are aromatic (OEReadMolecule perceives aromaticity in
-    // this OE version; OEAssignAromaticFlags below is a harmless no-op here but
-    // keeps the test correct for inputs that arrive un-perceived). The aromatic
-    // render must draw MORE bond pixels than a forced-single render because the
-    // inner ring lines add pixels.
-    OEChem::oemolistream ims;
-    ASSERT_TRUE(ims.open("/tmp/benzene.sdf")) << "benzene fixture missing";
+TEST(BondOrderRenderTest, AromaticRingShowsInnerLines) {
+    // Build benzene in-code (planar hexagon) and flag the ring aromatic, so the
+    // aromatic inner-line path is exercised without any external fixture. The
+    // aromatic render must draw MORE bond pixels than a forced-single render
+    // because the inner ring lines add pixels.
     OEChem::OEGraphMol mol;
-    ASSERT_TRUE(OEChem::OEReadMolecule(ims, mol));
-    OEChem::OEAssignAromaticFlags(mol);  // test-only perception
+    OEChem::OEAtomBase* c[6];
+    const double R = 1.397;  // benzene C-C ring radius (Angstrom)
+    for (int i = 0; i < 6; ++i) {
+        c[i] = mol.NewAtom(6);
+        const double ang = (M_PI / 3.0) * i;
+        double p[3] = {R * std::cos(ang), R * std::sin(ang), 0.0};
+        mol.SetCoords(c[i], p);
+    }
+    for (int i = 0; i < 6; ++i) {
+        OEChem::OEBondBase* bond = mol.NewBond(c[i], c[(i + 1) % 6], (i % 2 == 0) ? 2 : 1);
+        bond->SetAromatic(true);
+        c[i]->SetAromatic(true);
+    }
     const OEChem::OEMolBase& base = mol;
 
     const QSize sz(400, 400);
@@ -851,8 +860,8 @@ TEST(BondOrderRenderTest, AromaticRingShowsInnerLinesWhenFlagged) {
         int n = 0;
         for (int y = 0; y < sz.height(); ++y)
             for (int xx = 0; xx < sz.width(); ++xx) {
-                QColor c = img.pixelColor(xx, y);
-                if (c.red() < 230 || c.green() < 230 || c.blue() < 230) ++n;  // non-bg
+                QColor c2 = img.pixelColor(xx, y);
+                if (c2.red() < 230 || c2.green() < 230 || c2.blue() < 230) ++n;  // non-bg
             }
         return n;
     };

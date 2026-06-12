@@ -29,13 +29,19 @@ QVector3D bond_offset_dir(const QVector3D& axis, const QVector3D& ref);
 
 /// \brief Build half-bond BondData from an OpenEye molecule under a stick style.
 ///
-/// Iterates the molecule's existing bonds (no perception). Each bond is split at
-/// its midpoint into two half-bonds; each half takes its near atom's element
-/// color and the style's radius. Zero-length (coincident-atom) bonds are skipped.
+/// Iterates the molecule's existing bonds, reading order/aromaticity AS-IS (no
+/// perception). Each rendered cylinder line is split at its midpoint into two
+/// half-bonds, each taking its near atom's element color and the style's radius.
+/// A bond expands to multiple lines by multiplicity: single -> 1 line (2
+/// half-bonds), double or aromatic -> 2 lines (aromatic = a full line plus a
+/// shorter, thinner inner line offset toward a neighbor), triple -> 3 lines.
+/// StickStyle::single_bonds() forces every bond to a single line. Zero-length
+/// (coincident-atom) bonds are skipped.
 ///
 /// \param mol The source molecule (non-owning; must be non-null).
-/// \param style Stick style controlling radius and color scheme.
-/// \returns BondData with 2 entries per (non-degenerate) bond; empty if no bonds.
+/// \param style Stick style controlling radius, color scheme, and single_bonds.
+/// \returns BondData: 2 half-bonds per single bond, 4 per double/aromatic, 6 per
+///          triple; empty if the molecule has no bonds.
 /// \throws DataError if mol is null.
 BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style);
 
