@@ -45,9 +45,9 @@ constexpr float TRIPLE_OFFSET_FACTOR = 3.0f;  // outer offset for triples
 bool first_other_neighbor(const OEChem::OEMolBase* mol, const OEChem::OEAtomBase* atom,
                           const OEChem::OEAtomBase* exclude, QVector3D& out) {
     for (OESystem::OEIter nbr = atom->GetAtoms(); nbr; ++nbr) {
-        const OEChem::OEAtomBase& n = *nbr;
-        if (&n == exclude) continue;
-        out = atom_pos(mol, &n);
+        const OEChem::OEAtomBase* n = nbr;
+        if (n == exclude) continue;
+        out = atom_pos(mol, n);
         return true;
     }
     return false;
