@@ -39,6 +39,8 @@ void add_line(BondData& data, const QVector3D& a, const QVector3D& b, float radi
 // Multi-bond geometry (in units of the stick radius; tuned visually on benzene).
 constexpr float OFFSET_FACTOR = 2.5f;         // double / aromatic side offset
 constexpr float TRIPLE_OFFSET_FACTOR = 3.0f;  // outer offset for triples
+constexpr float INNER_LEN_FRAC = 0.6f;        // aromatic inner line length fraction
+constexpr float INNER_RADIUS_FRAC = 0.7f;     // aromatic inner line radius fraction
 
 // Position of any atom bonded to `atom` other than `exclude`, written to `out`.
 // Returns false if `atom` has no such neighbor.
@@ -120,9 +122,16 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
         const QVector3D off = bond_offset_dir(p_end - p_bgn, ref - p_bgn);
 
         if (aromatic) {
-            // Handled in Task 5; for now render as a plain single line so this task
-            // stays focused on explicit order. (Replaced in Task 5.)
+            // Main full-length line on the bond axis.
             add_line(data, p_bgn, p_end, radius, c_bgn, c_end, idx);
+            // Inner line: offset toward the ring interior, shorter (about the
+            // midpoint) and thinner -> 3dmol's aromatic "inner ring" look.
+            const QVector3D d = off * (OFFSET_FACTOR * radius);
+            const QVector3D mid = (p_bgn + p_end) * 0.5f;
+            const QVector3D half = (p_end - p_bgn) * (0.5f * INNER_LEN_FRAC);
+            const QVector3D ia = mid - half + d;
+            const QVector3D ib = mid + half + d;
+            add_line(data, ia, ib, radius * INNER_RADIUS_FRAC, c_bgn, c_end, idx);
             continue;
         }
 

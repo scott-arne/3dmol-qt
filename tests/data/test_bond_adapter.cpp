@@ -260,5 +260,47 @@ TEST(BondAdapterTest, DoubleBondWithNoNeighborStillRenders) {
     EXPECT_EQ(b.size(), 4u);  // still two parallel lines, no crash
 }
 
+TEST(BondAdapterTest, AromaticBondYieldsMainPlusShorterThinnerInnerLine) {
+    // Build a 3-atom fragment, mark the central bond aromatic, give a neighbor
+    // so the inner line offsets toward the ring interior.
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* c1 = mol.NewAtom(6);
+    OEChem::OEAtomBase* c2 = mol.NewAtom(6);
+    OEChem::OEAtomBase* c3 = mol.NewAtom(6);  // neighbor on c1
+    double p1[3] = {0, 0, 0};
+    double p2[3] = {1.4, 0, 0};
+    double p3[3] = {-0.7, 1.2, 0};
+    mol.SetCoords(c1, p1); mol.SetCoords(c2, p2); mol.SetCoords(c3, p3);
+    OEChem::OEBondBase* bond = mol.NewBond(c1, c2, 1);
+    bond->SetAromatic(true);
+    c1->SetAromatic(true);
+    c2->SetAromatic(true);
+    mol.NewBond(c1, c3, 1);
+
+    StickStyle style;  // radius 0.25
+    const float r = 0.25f;
+    BondData b = build_bond_data(as_base(mol), style);
+
+    // Aromatic bond (idx 0) -> main pair (2) + inner pair (2) = 4 half-bonds.
+    // Plus the single c1-c3 bond (idx 1) -> 2. Total 6.
+    EXPECT_EQ(b.size(), 6u);
+
+    // Among bond idx 0 half-bonds, the MAIN line uses radius r; the INNER line
+    // uses a smaller radius. Collect distinct radii for bond 0.
+    bool has_main_radius = false, has_inner_radius = false;
+    float main_len_sq = 0.0f, inner_len_sq = 1e9f;
+    for (std::size_t i = 0; i < b.size(); ++i) {
+        if (b.source_bond_idx[i] != 0u) continue;
+        if (std::abs(b.radii[i] - r) < 1e-4f) has_main_radius = true;
+        if (b.radii[i] < r - 1e-4f) has_inner_radius = true;
+        const float seg = (b.ends[i] - b.starts[i]).lengthSquared();  // half-line length^2
+        if (std::abs(b.radii[i] - r) < 1e-4f) main_len_sq = std::max(main_len_sq, seg);
+        else inner_len_sq = std::min(inner_len_sq, seg);
+    }
+    EXPECT_TRUE(has_main_radius);   // main line at full radius
+    EXPECT_TRUE(has_inner_radius);  // inner line is thinner
+    EXPECT_LT(inner_len_sq, main_len_sq);  // inner line is shorter
+}
+
 }  // namespace test
 }  // namespace oe3dmol
