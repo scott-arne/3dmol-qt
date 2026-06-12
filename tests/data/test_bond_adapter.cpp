@@ -300,6 +300,24 @@ TEST(BondAdapterTest, AromaticBondYieldsMainPlusShorterThinnerInnerLine) {
     EXPECT_TRUE(has_main_radius);   // main line at full radius
     EXPECT_TRUE(has_inner_radius);  // inner line is thinner
     EXPECT_LT(inner_len_sq, main_len_sq);  // inner line is shorter
+
+    // The inner line must CLEAR the full-radius main cylinder, otherwise it is
+    // swallowed by the main bond and invisible (the "consumed inner ring" bug).
+    // The bond runs along +x through the origin, so the main cylinder occupies
+    // |perp| <= r around the x-axis; the inner line is offset toward the neighbor
+    // (here +y). Its perpendicular distance from the axis (max |y| of its
+    // half-bonds) must exceed r so it pokes clear of the main cylinder.
+    float inner_perp = 0.0f;
+    for (std::size_t i = 0; i < b.size(); ++i) {
+        if (b.source_bond_idx[i] != 0u) continue;
+        if (b.radii[i] < r - 1e-4f) {  // inner (thinner) half-bonds
+            inner_perp = std::max(inner_perp, std::abs(b.starts[i].y()));
+            inner_perp = std::max(inner_perp, std::abs(b.ends[i].y()));
+        }
+    }
+    EXPECT_GT(inner_perp, r)
+        << "aromatic inner line is buried in the full-radius main cylinder "
+        << "(inner offset " << inner_perp << " <= radius " << r << ")";
 }
 
 }  // namespace test

@@ -40,11 +40,15 @@ void add_line(BondData& data, const QVector3D& a, const QVector3D& b, float radi
 // + carbonyls). Offsets are small fractions of the radius so the parallel lines
 // of a double/triple sit close together and read as ONE bond that is split, with
 // total width close to a single stick -- not as widely separated detached bars.
-constexpr float OFFSET_FACTOR = 0.7f;         // double / aromatic side offset
+constexpr float OFFSET_FACTOR = 0.7f;         // double side offset
 constexpr float TRIPLE_OFFSET_FACTOR = 1.1f;  // outer offset for triples
 constexpr float MULTI_RADIUS_FRAC = 0.55f;    // thinner sub-cylinders for double/triple
 constexpr float INNER_LEN_FRAC = 0.6f;        // aromatic inner line length fraction
 constexpr float INNER_RADIUS_FRAC = 0.5f;     // aromatic inner line radius fraction
+// The aromatic main line is a FULL-radius cylinder (unlike the thin double-bond
+// sub-cylinders), so the inner line needs a larger offset to clear it and stay
+// visible as a distinct inner ring instead of being swallowed by the main bond.
+constexpr float AROMATIC_INNER_OFFSET_FACTOR = 1.6f;
 
 // Position of any atom bonded to `atom` other than `exclude`, written to `out`.
 // Returns false if `atom` has no such neighbor.
@@ -129,8 +133,9 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
             // Main full-length line on the bond axis.
             add_line(data, p_bgn, p_end, radius, c_bgn, c_end, idx);
             // Inner line: offset toward the ring interior, shorter (about the
-            // midpoint) and thinner -> 3dmol's aromatic "inner ring" look.
-            const QVector3D d = off * (OFFSET_FACTOR * radius);
+            // midpoint) and thinner -> 3dmol's aromatic "inner ring" look. Uses a
+            // larger offset than double bonds so it clears the full-radius main.
+            const QVector3D d = off * (AROMATIC_INNER_OFFSET_FACTOR * radius);
             const QVector3D mid = (p_bgn + p_end) * 0.5f;
             const QVector3D half = (p_end - p_bgn) * (0.5f * INNER_LEN_FRAC);
             const QVector3D ia = mid - half + d;

@@ -923,6 +923,5 @@ TEST(BondOrderRenderTest, DoubleBondNotMuchWiderThanSingle) {
         << "double bond far too wide (double_h=" << double_h << " single_h=" << single_h << ")";
 }
 
-
 }  // namespace test
 }  // namespace oe3dmol
