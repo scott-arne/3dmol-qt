@@ -723,5 +723,63 @@ TEST(SceneRendererTest, FrontHalfGeometryIsNotClipped) {
 }
 
 
+
+
+TEST(CylinderPipelineTest, TiltedBondCapStaysRounded) {
+    // Regression for flat caps on tilted bonds: the billboard used to extend past
+    // each endpoint along the 3D bond axis, which foreshortens as the bond tilts
+    // toward the camera, so the quad no longer covered the hemispherical cap's
+    // screen disc and the near cap rendered as a flat slice. A cap is a hemisphere
+    // of radius r centered on the endpoint -- its silhouette is a disc of radius r
+    // in the screen plane regardless of tilt -- so the cap end must be CONVEX
+    // (rounded), never a straight horizontal edge, at any tilt.
+    //
+    // Bond runs from the origin straight up the screen (+Y) but tilted strongly
+    // toward the camera (+Z). The near (bottom) endpoint's cap is the one that
+    // used to flatten. Sample rows near the bottom of the rendered shape: a
+    // rounded cap's filled WIDTH shrinks smoothly toward the tip; a flat slice
+    // keeps full width then drops to zero in one row.
+    const QSize sz(300, 300);
+    BondData bonds;
+    bonds.add(QVector3D(0, 0, 0), QVector3D(0.0f, 1.0f, 1.2f), 0.35f, Color(80, 80, 220), 0u);
+    BoundingBox bounds;
+    bounds.include(QVector3D(0, 0, 0), 0.35f);
+    bounds.include(QVector3D(0.0f, 1.0f, 1.2f), 0.35f);
+    AtomData none;
+    RhiContext ctx(sz);
+    SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+    renderer.set_geometry(none, bonds);
+    Camera cam; cam.zoom_to(bounds);
+    QImage img = ctx.render_frame(QColor(255, 255, 255), [&](QRhiCommandBuffer* cb) {
+        renderer.draw(cb, cam, sz);
+    });
+    ASSERT_FALSE(img.isNull());
+
+    auto filled_width = [&](int y) {
+        int n = 0;
+        for (int x = 0; x < sz.width(); ++x) {
+            QColor c = img.pixelColor(x, y);
+            if (c.blue() > 120 && c.red() < 160) ++n;  // bond pixel (bluish, not white bg)
+        }
+        return n;
+    };
+    int bottom = -1;
+    for (int y = sz.height() - 1; y >= 0; --y) { if (filled_width(y) > 0) { bottom = y; break; } }
+    ASSERT_GT(bottom, 10);
+    // A rounded hemisphere tapers to a point: the bottom row is a small fraction
+    // of the body width a few rows up. A flat slice drops from full width to zero
+    // in one row, so its bottom row is nearly the full body width. Measured:
+    // rounded bottom/body ~= 8/38 ~ 0.2; flat slice ~= 34/36 ~ 0.94.
+    const int body = filled_width(bottom - 6);
+    ASSERT_GT(body, 0);
+    EXPECT_LT(filled_width(bottom), body / 2)
+        << "near cap is a flat slice, not a rounded hemisphere (bottom width="
+        << filled_width(bottom) << " vs body=" << body << ")";
+}
+
+
+
+
+
 }  // namespace test
 }  // namespace oe3dmol

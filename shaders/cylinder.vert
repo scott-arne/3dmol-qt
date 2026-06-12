@@ -42,43 +42,47 @@ void main() {
     vP2 = to.xyz;
     vec3 axis = to.xyz - pt.xyz;
 
-    // Build an oriented billboard rectangle that fully encloses the capsule's
-    // screen silhouette (body + both hemispherical end caps). Anchor each vertex
-    // at the endpoint it selects (corner.x = +1 -> p1, -1 -> p2), then push it
-    // OUTWARD along the bond axis (away from the other endpoint) so the quad
-    // extends past each cap, and laterally by the radius.
+    // Build a SCREEN-FACING billboard rectangle that fully encloses the
+    // capsule's screen silhouette (body + both hemispherical end caps). Each
+    // hemisphere cap projects to a disc of radius r in the screen plane no
+    // matter how the bond is tilted, so the quad must be expanded in the screen
+    // plane (perpendicular to the view ray), NOT along the 3D bond axis.
     //
-    // The original 3dmol shader relied on a camera-plane projection of the
-    // anchor to enlarge the quad; in this port that projection collapsed to a
-    // no-op (the anchor maps to itself), so the quad never extended past the
-    // endpoints and the far half of each hemispherical cap was clipped, leaving
-    // a background hole at bond joints. Pushing along the axis instead covers
-    // the whole capsule for every orientation.
+    // Pushing along the 3D axis (an earlier approach) foreshortens as the bond
+    // tilts toward the camera: the axis's on-screen length shrinks while the cap
+    // disc does not, so the quad stopped covering the near cap and it rendered as
+    // a flat slice. Building the quad from screen-plane axes fixes that for every
+    // orientation.
     vec3 anchor = (corner.x >= 0.0) ? vP1 : vP2;
     bool isperspective = (ubo.projectionMatrix[3][3] == 0.0);
 
-    // View-space ray direction toward the anchor (perspective) or straight back
-    // (orthographic); the lateral axis is perpendicular to both the ray and the
-    // bond axis, matching the frag-shader ray setup.
+    // View ray toward the anchor (perspective) or straight back (orthographic).
     vec3 rdir = isperspective ? normalize(anchor) : vec3(0.0, 0.0, -1.0);
     vec3 axisDir = normalize(axis);
+    // Lateral: in the screen plane (perp to the ray) and perp to the bond axis.
     vec3 latCross = cross(rdir, axisDir);
-    // When the bond points straight at the camera, rdir ∥ axisDir and the cross
-    // product vanishes; fall back to an arbitrary axis-perpendicular so the
-    // billboard still covers the end-on circular silhouette instead of collapsing.
-    vec3 lateral = (dot(latCross, latCross) < 1e-12)
-        ? normalize(cross(axisDir, vec3(0.0, 1.0, 0.0)) + cross(axisDir, vec3(1.0, 0.0, 0.0)))
+    // When the bond points straight at the camera, rdir is parallel to axisDir
+    // and the cross product vanishes; fall back to an arbitrary screen axis so
+    // the billboard still covers the end-on circular silhouette.
+    bool degenerate = dot(latCross, latCross) < 1e-12;
+    vec3 lateral = degenerate
+        ? normalize(cross(rdir, vec3(0.0, 1.0, 0.0)) + cross(rdir, vec3(1.0, 0.0, 0.0)))
         : normalize(latCross);
+    // Screen-projected bond axis: in the screen plane (perp to the ray) AND
+    // perp to lateral, i.e. the on-screen direction the bond runs. This stays a
+    // full unit length regardless of tilt, so pushing by r along it always
+    // clears the cap disc on screen (no foreshortening).
+    vec3 axisScreen = degenerate ? vec3(0.0) : normalize(cross(lateral, rdir));
 
-    // Outward sign along the axis: -1 at p1, +1 at p2. Lateral sign combines the
-    // corner sign with the endpoint so vertices 0,1,2,3 trace the rectangle
-    // perimeter (not a bow-tie) under the existing {0,1,2, 2,3,0} index order.
+    // Outward sign along the (screen) axis: -1 at p1, +1 at p2. Lateral sign
+    // combines the corner sign with the endpoint so vertices 0,1,2,3 trace the
+    // rectangle perimeter (not a bow-tie) under the {0,1,2, 2,3,0} index order.
     float axialSign = (corner.x >= 0.0) ? -1.0 : 1.0;
     float lateralSign = corner.y * corner.x;
     float slop = 1.1;  // small margin so rasterized fragments fully cover the cap
 
     vec4 mvPosition = vec4(anchor, 1.0);
-    mvPosition.xyz += axialSign * axisDir * (instRadius * slop);
+    mvPosition.xyz += axialSign * axisScreen * (instRadius * slop);
     mvPosition.xyz += lateralSign * lateral * (instRadius * slop);
 
     vCpos = mvPosition.xyz;
