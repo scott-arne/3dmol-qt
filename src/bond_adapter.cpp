@@ -112,7 +112,7 @@ std::vector<std::vector<const OEChem::OEAtomBase*>> aromatic_rings(
             const OEChem::OEAtomBase* cur = q.front();
             q.pop();
             const unsigned cd = depth[cur->GetIdx()];
-            if (cd >= MAX_RING) continue;
+            if (cd + 1 >= MAX_RING) continue;  // bound the recovered ring to <= MAX_RING atoms
             for (OESystem::OEIter nb = cur->GetBonds(); nb; ++nb) {
                 const OEChem::OEBondBase& e = *nb;
                 if (!e.IsAromatic()) continue;

@@ -13,9 +13,9 @@ constexpr double STICK_DEFAULT_RADIUS = 0.25;
 /// \brief How aromatic bonds are drawn.
 ///
 /// Kekule: render the molecule's alternating single/double bond orders (no
-/// special aromatic geometry) -- a clean classical look. Delocalized: render a
-/// symmetric solid + dashed inner-line pair per aromatic bond (3dmol's "dashed"
-/// aromatic style).
+/// special aromatic geometry) -- a clean classical look. Delocalized: render
+/// aromatic ring bonds as normal full-radius cylinders plus a thin dashed circle
+/// inside each aromatic ring (the "circle in the ring" depiction).
 enum class AromaticStyle { Kekule, Delocalized };
 
 /// \brief Style parameters for the stick (bond) representation.
