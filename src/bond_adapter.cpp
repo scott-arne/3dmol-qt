@@ -51,8 +51,9 @@ constexpr float DOUBLE_OFFSET = 0.6f;        // double line offset / R   (3dmol:
 constexpr float TRIPLE_OFFSET = 0.75f;       // triple outer offset / R  (3dmol: r*3)
 // Aromatic delocalized circle (Delocalized style): a thin dashed ring inside
 // each aromatic ring. Tuned visually on benzene.
-constexpr float RING_CIRCLE_FRACTION = 0.6f;   // circle radius / ring apothem (sits inside bonds)
-constexpr float RING_CIRCLE_TUBE_FRAC = 0.55f; // circle tube radius / bond radius (thinner than bonds)
+constexpr float RING_CIRCLE_FRACTION = 0.45f;  // circle radius / ring apothem (well inside bonds,
+                                               // leaves margin even in 5-membered rings)
+constexpr float RING_CIRCLE_TUBE_FRAC = 0.30f; // circle tube radius / bond radius (clearly thinner)
 constexpr int   CIRCLE_SEGMENTS = 24;          // chords around the circle; every
                                                // other one is drawn -> 12 visible
                                                // dashes (clearly dashed, not solid)
