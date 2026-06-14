@@ -3,6 +3,7 @@
 ///        dropdown, plus a --grab PNG mode for headless capture.
 
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -25,14 +26,14 @@ namespace {
 enum Representation { kSphere = 0, kBallAndStick = 1, kSticks = 2 };
 
 // Map a representation index to the StyleSpec list the widget should apply.
-std::vector<oe3dmol::StyleSpec> styles_for(int index) {
+std::vector<oe3dmol::StyleSpec> styles_for(int index, oe3dmol::AromaticStyle arom) {
     using namespace oe3dmol;
+    const auto stick = [&] { return StickStyle{}.color(ColorScheme::Jmol).aromatic_style(arom); };
     switch (index) {
         case kBallAndStick:
-            return {SphereStyle{}.scale(0.3).color(ColorScheme::Jmol),
-                    StickStyle{}.color(ColorScheme::Jmol)};
+            return {SphereStyle{}.scale(0.3).color(ColorScheme::Jmol), stick()};
         case kSticks:
-            return {StickStyle{}.color(ColorScheme::Jmol)};
+            return {stick()};
         case kSphere:
         default:
             return {SphereStyle{}.color(ColorScheme::Jmol)};
@@ -95,7 +96,7 @@ int main(int argc, char** argv) {
     if (!grab_path.empty()) {
         oe3dmol::MoleculeViewerWidget widget;
         const int model = widget.add_model(&base);
-        widget.set_style(model, styles_for(initial_rep));
+        widget.set_style(model, styles_for(initial_rep, oe3dmol::AromaticStyle::Kekule));
         widget.resize(800, 600);
         const QImage frame = widget.grabFramebuffer();
         if (frame.isNull()) {
@@ -128,21 +129,34 @@ int main(int argc, char** argv) {
     combo->addItem(QStringLiteral("Sticks"));
     toolbar->addWidget(label);
     toolbar->addWidget(combo);
+    auto* arom_label = new QLabel(QStringLiteral("  Aromatics:"));
+    auto* arom_combo = new QComboBox;
+    arom_combo->addItem(QStringLiteral("Kekule"));       // index 0 (default)
+    arom_combo->addItem(QStringLiteral("Delocalized"));  // index 1
+    toolbar->addWidget(arom_label);
+    toolbar->addWidget(arom_combo);
     toolbar->addWidget(hint);
     toolbar->addStretch(1);
 
     // The layout takes ownership of the viewer once added below.
+    auto arom = std::make_shared<oe3dmol::AromaticStyle>(oe3dmol::AromaticStyle::Kekule);
     auto* viewer = new oe3dmol::MoleculeViewerWidget;
     const int model = viewer->add_model(&base);
-    viewer->set_style(model, styles_for(initial_rep));
+    viewer->set_style(model, styles_for(initial_rep, *arom));
 
     layout->addLayout(toolbar);
     layout->addWidget(viewer, 1);  // viewer fills the remaining space
 
     // Live switching: re-apply the selected representation on change.
     QObject::connect(combo, &QComboBox::currentIndexChanged,
-                     [viewer, model](int index) {
-                         viewer->set_style(model, styles_for(index));
+                     [viewer, model, arom](int index) {
+                         viewer->set_style(model, styles_for(index, *arom));
+                     });
+    QObject::connect(arom_combo, &QComboBox::currentIndexChanged,
+                     [viewer, model, arom, combo](int aidx) {
+                         *arom = (aidx == 1) ? oe3dmol::AromaticStyle::Delocalized
+                                             : oe3dmol::AromaticStyle::Kekule;
+                         viewer->set_style(model, styles_for(combo->currentIndex(), *arom));
                      });
     combo->setCurrentIndex(initial_rep);  // reflect the CLI selection in the control
 
