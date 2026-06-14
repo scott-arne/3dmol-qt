@@ -296,7 +296,6 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
         accumulate_divergent_neighbor(src, abgn, aend, axis, best, ref);
         accumulate_divergent_neighbor(src, aend, abgn, axis, best, ref);
         const QVector3D off = bond_offset_dir(axis, ref - p_bgn);
-        const QVector3D mid = (p_bgn + p_end) * 0.5f;
 
         if (aromatic) {
             // Delocalized: aromatic ring bonds are normal full-radius cylinders;

@@ -14,6 +14,8 @@ option(OE3DMOL_BUILD_TESTS "Build tests" ON)
 option(OE3DMOL_BUILD_GPU_TESTS "Build tests that require a live RHI device" ON)
 option(OE3DMOL_BUILD_EXAMPLES "Build examples" ON)
 option(OE3DMOL_UNIVERSAL2 "Build universal2 binary for macOS" OFF)
+option(OE3DMOL_WERROR "Treat compiler warnings as errors" OFF)
+option(OE3DMOL_SANITIZE "Build with AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
 
 if(APPLE AND OE3DMOL_UNIVERSAL2)
     set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "Build architectures" FORCE)
@@ -44,6 +46,27 @@ if(Qt6_VERSION VERSION_LESS 6.6)
     message(FATAL_ERROR "Qt 6.6+ is required for a stable QRhi API (found ${Qt6_VERSION}).")
 endif()
 
+# Apply the project's warning level (and optional Werror/sanitizers) to one of
+# our own targets. Applied PRIVATE so flags never propagate to consumers and do
+# not enter the install/export interface. Qt and OpenEye come in as imported
+# targets, whose interface includes CMake treats as -isystem by default, so
+# third-party header warnings stay quiet.
+function(oe3dmol_set_warnings tgt)
+    target_compile_options(${tgt} PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall;-Wextra>
+        $<$<CXX_COMPILER_ID:MSVC>:/W4>
+        $<$<AND:$<BOOL:${OE3DMOL_WERROR}>,$<CXX_COMPILER_ID:GNU,Clang,AppleClang>>:-Werror>
+        $<$<AND:$<BOOL:${OE3DMOL_WERROR}>,$<CXX_COMPILER_ID:MSVC>>:/WX>
+    )
+    if(OE3DMOL_SANITIZE AND NOT MSVC)
+        # NOTE: applied to our libraries only. For ASan/UBSan to work end to end,
+        # the linking executables (tests, examples) must also be built with these
+        # flags; enable them there too when sanitizing the full suite.
+        target_compile_options(${tgt} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+        target_link_options(${tgt} PRIVATE -fsanitize=address,undefined)
+    endif()
+endfunction()
+
 # Targets are added by subsequent tasks.
 
 # ---- oe3dmol_core ----
@@ -63,6 +86,7 @@ target_include_directories(oe3dmol_core
         $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(oe3dmol_core PUBLIC Qt6::Core Qt6::Gui)
+oe3dmol_set_warnings(oe3dmol_core)
 
 # ---- oe3dmol_geometry ----
 add_library(oe3dmol_geometry
@@ -76,6 +100,7 @@ target_include_directories(oe3dmol_geometry
         $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(oe3dmol_geometry PUBLIC oe3dmol_core)
+oe3dmol_set_warnings(oe3dmol_geometry)
 
 # ---- oe3dmol_data ----
 add_library(oe3dmol_data
@@ -96,6 +121,7 @@ target_link_libraries(oe3dmol_data
         OpenEye::OEGrid
         OpenEye::OESystem
 )
+oe3dmol_set_warnings(oe3dmol_data)
 
 # ---- oe3dmol_render ----
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/compile_shaders.cmake)
@@ -134,6 +160,7 @@ target_link_libraries(oe3dmol_render
         Qt6::Gui
         Qt6::GuiPrivate
 )
+oe3dmol_set_warnings(oe3dmol_render)
 
 # ---- oe3dmol_widget (interactive QRhiWidget; the only QtWidgets consumer) ----
 # The Q_OBJECT header lives under include/oe3dmol; list it explicitly so AUTOMOC
@@ -156,6 +183,7 @@ target_link_libraries(oe3dmol_widget
         Qt6::Widgets
         Qt6::GuiPrivate
 )
+oe3dmol_set_warnings(oe3dmol_widget)
 
 if(OE3DMOL_BUILD_TESTS)
     enable_testing()
