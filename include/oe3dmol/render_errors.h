@@ -14,4 +14,12 @@ public:
     explicit RenderError(const std::string& message) : std::runtime_error(message) {}
 };
 
+/// \brief Throw RenderError(message) when cond is false. Terse guard for the
+/// many RHI "create returned null / failed" checks in the render layer.
+inline void render_require(bool cond, const std::string& message) {
+    if (!cond) {
+        throw RenderError(message);
+    }
+}
+
 }  // namespace oe3dmol

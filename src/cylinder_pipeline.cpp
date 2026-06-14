@@ -153,11 +153,13 @@ void CylinderPipeline::upload(const MeshBuffer& mesh, const std::vector<float>& 
 
     if (!vbuf_ || vbuf_->size() < vbytes) {
         vbuf_.reset(rhi_->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, vbytes));
-        vbuf_->create();
+        render_require(vbuf_ && vbuf_->create(),
+                       "CylinderPipeline: failed to create vertex buffer");
     }
     if (!ibuf_ || ibuf_->size() < ibytes) {
         ibuf_.reset(rhi_->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::IndexBuffer, ibytes));
-        ibuf_->create();
+        render_require(ibuf_ && ibuf_->create(),
+                       "CylinderPipeline: failed to create index buffer");
     }
     batch->uploadStaticBuffer(vbuf_.get(), mesh.vertices.data());
     batch->uploadStaticBuffer(ibuf_.get(), mesh.indices.data());
@@ -171,7 +173,8 @@ void CylinderPipeline::upload(const MeshBuffer& mesh, const std::vector<float>& 
         if (!instbuf_ || instbuf_->size() < instbytes) {
             instbuf_.reset(
                 rhi_->newBuffer(QRhiBuffer::Static, QRhiBuffer::VertexBuffer, instbytes));
-            instbuf_->create();
+            render_require(instbuf_ && instbuf_->create(),
+                           "CylinderPipeline: failed to create instance buffer");
         }
         batch->uploadStaticBuffer(instbuf_.get(), instances.data());
     }

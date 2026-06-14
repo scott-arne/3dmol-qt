@@ -36,15 +36,14 @@ RhiContext::RhiContext(const QSize& size) : size_(size) {
 
     color_.reset(rhi_->newTexture(QRhiTexture::RGBA8, size_, 1,
                                   QRhiTexture::RenderTarget | QRhiTexture::UsedAsTransferSource));
-    if (!color_->create()) {
-        throw RenderError("RhiContext: failed to create color texture on backend " +
-                          backend_name().toStdString());
-    }
+    render_require(color_ && color_->create(),
+                   "RhiContext: failed to create color texture on backend " +
+                       backend_name().toStdString());
 
     depth_.reset(rhi_->newRenderBuffer(QRhiRenderBuffer::DepthStencil, size_, 1));
-    if (!depth_->create()) {
-        throw RenderError("RhiContext: failed to create depth buffer");
-    }
+    render_require(depth_ && depth_->create(),
+                   "RhiContext: failed to create depth buffer on backend " +
+                       backend_name().toStdString());
 
     QRhiTextureRenderTargetDescription desc;
     QRhiColorAttachment color_att(color_.get());
@@ -52,11 +51,12 @@ RhiContext::RhiContext(const QSize& size) : size_(size) {
     desc.setDepthStencilBuffer(depth_.get());
 
     rt_.reset(rhi_->newTextureRenderTarget(desc));
+    render_require(rt_ != nullptr, "RhiContext: failed to create texture render target");
     rp_.reset(rt_->newCompatibleRenderPassDescriptor());
+    render_require(rp_ != nullptr, "RhiContext: failed to create render pass descriptor");
     rt_->setRenderPassDescriptor(rp_.get());
-    if (!rt_->create()) {
-        throw RenderError("RhiContext: failed to create render target");
-    }
+    render_require(rt_->create(), "RhiContext: failed to create render target on backend " +
+                                      backend_name().toStdString());
 }
 
 RhiContext::~RhiContext() = default;

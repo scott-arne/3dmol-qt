@@ -134,11 +134,13 @@ void SphereImposterPipeline::upload(const MeshBuffer& mesh, QRhiResourceUpdateBa
 
     if (!vbuf_ || vbuf_->size() < vbytes) {
         vbuf_.reset(rhi_->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, vbytes));
-        vbuf_->create();
+        render_require(vbuf_ && vbuf_->create(),
+                       "SphereImposterPipeline: failed to create vertex buffer");
     }
     if (!ibuf_ || ibuf_->size() < ibytes) {
         ibuf_.reset(rhi_->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::IndexBuffer, ibytes));
-        ibuf_->create();
+        render_require(ibuf_ && ibuf_->create(),
+                       "SphereImposterPipeline: failed to create index buffer");
     }
     batch->uploadStaticBuffer(vbuf_.get(), mesh.vertices.data());
     batch->uploadStaticBuffer(ibuf_.get(), mesh.indices.data());
