@@ -53,10 +53,10 @@ constexpr float TRIPLE_OFFSET = 0.75f;       // triple outer offset / R  (3dmol:
 // each aromatic ring. Tuned visually on benzene.
 constexpr float RING_CIRCLE_FRACTION = 0.45f;  // circle radius / ring apothem (well inside bonds,
                                                // leaves margin even in 5-membered rings)
-constexpr float RING_CIRCLE_TUBE_FRAC = 0.30f; // circle tube radius / bond radius (clearly thinner)
-constexpr int   CIRCLE_SEGMENTS = 24;          // chords around the circle; every
-                                               // other one is drawn -> 12 visible
-                                               // dashes (clearly dashed, not solid)
+constexpr float RING_CIRCLE_TUBE_FRAC = 0.18f; // circle tube radius / bond radius (thin, delicate)
+constexpr int   CIRCLE_SEGMENTS = 48;          // chord points around the circle
+constexpr int   CIRCLE_DASH_PERIOD = 4;        // draw 1 chord, skip 3 -> 25% duty,
+                                               // i.e. 12 short dashes with clear gaps
 
 // Accumulate the neighbor of `atom` (other than `exclude`) whose bond is MOST
 // perpendicular to `axis` -- the largest cross-product magnitude. This is 3dmol's
@@ -193,9 +193,12 @@ void add_aromatic_circle(BondData& data, const std::vector<QVector3D>& ring_pos,
                         static_cast<float>(CIRCLE_SEGMENTS);
         return centroid + circle_r * (std::cos(t) * u + std::sin(t) * v);
     };
-    // Dashed: draw every other chord segment.
-    for (int i = 0; i < CIRCLE_SEGMENTS; i += 2) {
-        data.add(pt(i), pt(i + 1), tube_r, color, bond_index);
+    // Dashed: draw 1 chord then skip CIRCLE_DASH_PERIOD-1, giving short dashes
+    // separated by clear gaps (a dashed ring, not a near-closed circle).
+    for (int i = 0; i < CIRCLE_SEGMENTS; ++i) {
+        if (i % CIRCLE_DASH_PERIOD == 0) {
+            data.add(pt(i), pt(i + 1), tube_r, color, bond_index);
+        }
     }
 }
 
