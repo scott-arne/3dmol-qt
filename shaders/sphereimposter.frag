@@ -41,7 +41,7 @@ void main() {
     vec3 lightWeight = ubo.directionalLightColor.xyz * directionalLightWeighting;
     vec3 col = lightWeight * vColor.rgb;
 
-    fragColor = vec4(col, vColor.a * vColor.a);
+    fragColor = vec4(col, vColor.a);
 
     if (ubo.fogNear != ubo.fogFar) {
         float depth = -cameraPos.z;

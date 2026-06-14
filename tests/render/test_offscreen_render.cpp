@@ -121,9 +121,10 @@ TEST(SphereImposterPipelineTest, OpacityDarkensOverBlackBackground) {
     QColor semi = render_alpha(0.5f);
     // Opaque center is bright red.
     EXPECT_GT(opaque.red(), 150);
-    // Semi-transparent center over black is materially dimmer (alpha^2=0.25 of opaque)...
-    EXPECT_LT(semi.red(), opaque.red() - 30);
-    // ...but still clearly rendered (not background black).
+    // Linear alpha: semi-transparent red over black composites at ~0.5 of the
+    // opaque color (src*a + dst*(1-a), dst black) -- NOT alpha^2 = 0.25.
+    EXPECT_NEAR(semi.red(), opaque.red() / 2, 30);
+    // ...and is clearly rendered (not background black).
     EXPECT_GT(semi.red(), 10);
 }
 

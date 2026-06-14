@@ -79,12 +79,12 @@ void main() {
     float ndcDepth = clipPos.z / clipPos.w;
     gl_FragDepth = 0.5 * ndcDepth + 0.5;
 
-    // One-sided Lambert + fog + squared alpha, identical to sphereimposter.frag.
+    // One-sided Lambert + linear alpha + fog, identical to sphereimposter.frag.
     float dotProduct = max(dot(norm, vLight), 0.0);
     vec3 lightWeight = ubo.directionalLightColor.xyz * dotProduct;
     vec3 col = lightWeight * vColor;
 
-    fragColor = vec4(col, vAlpha * vAlpha);
+    fragColor = vec4(col, vAlpha);
 
     if (ubo.fogNear != ubo.fogFar) {
         float depth = -qi.z;
