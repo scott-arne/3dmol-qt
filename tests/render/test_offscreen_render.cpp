@@ -824,28 +824,32 @@ TEST(BondOrderRenderTest, DoubleBondShowsTwoSeparatedCylinders) {
                         << bands << ")";
 }
 
-TEST(BondOrderRenderTest, AromaticBondShowsTwoSeparatedLines) {
-    // DELOCALIZED aromatic style renders like a double bond: a symmetric pair of
-    // thin lines straddling the axis (solid outer + dashed inner), so a scan
-    // perpendicular to the bond crosses TWO filled bands with a gap between them.
-    // Build a single horizontal aromatic bond (face-on) with a neighbor so the
-    // offset plane is in-screen; offset is vertical. (Default is Kekule.)
-    const QSize sz(256, 256);
-    RhiContext ctx(sz);
+TEST(BondOrderRenderTest, DelocalizedBenzeneShowsInnerCircle) {
+    // Delocalized benzene face-on: aromatic ring bonds are full cylinders, and a
+    // thin dashed circle appears INSIDE the hexagon. Sample a central interior
+    // disk (well inside the bonds) and confirm multiple bond-colored hits there --
+    // i.e. a circle exists in the ring interior. A single-bond/Kekule benzene
+    // would leave this interior empty.
     OEChem::OEGraphMol mol;
-    OEChem::OEAtomBase* c1 = mol.NewAtom(6);
-    OEChem::OEAtomBase* c2 = mol.NewAtom(6);
-    OEChem::OEAtomBase* c3 = mol.NewAtom(6);  // neighbor -> in-plane offset (+y)
-    double p1[3] = {-0.7, 0, 0}, p2[3] = {0.7, 0, 0}, p3[3] = {-1.4, 0.7, 0};
-    mol.SetCoords(c1, p1); mol.SetCoords(c2, p2); mol.SetCoords(c3, p3);
-    OEChem::OEBondBase* bd = mol.NewBond(c1, c2, 1);
-    bd->SetAromatic(true);
-    c1->SetAromatic(true); c2->SetAromatic(true);
-    mol.NewBond(c1, c3, 1);
+    OEChem::OEAtomBase* c[6];
+    const double R = 1.4;
+    for (int i = 0; i < 6; ++i) {
+        c[i] = mol.NewAtom(6);
+        const double a = (M_PI / 3.0) * i;
+        double p[3] = {R * std::cos(a), R * std::sin(a), 0.0};
+        mol.SetCoords(c[i], p);
+    }
+    for (int i = 0; i < 6; ++i) {
+        OEChem::OEBondBase* b = mol.NewBond(c[i], c[(i + 1) % 6], (i % 2 == 0) ? 2 : 1);
+        b->SetAromatic(true);
+        c[i]->SetAromatic(true);
+    }
     const OEChem::OEMolBase& base = mol;
 
+    const QSize sz(400, 400);
+    RhiContext ctx(sz);
     BondData bonds = build_bond_data(
-        &base, StickStyle{}.radius(0.10).aromatic_style(AromaticStyle::Delocalized));
+        &base, StickStyle{}.aromatic_style(AromaticStyle::Delocalized));
     AtomData none;
     SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
     renderer.set_geometry(none, bonds);
@@ -855,27 +859,20 @@ TEST(BondOrderRenderTest, AromaticBondShowsTwoSeparatedLines) {
     });
     ASSERT_FALSE(img.isNull());
 
-    // Scan the central column (x = width/2, where the bond crosses) vertically and
-    // count filled bands. The solid line + the dashed line (where a dash lands at
-    // center) read as two separate bands; even if a dash gap falls on this column,
-    // the next column over catches it -- so scan a few central columns and take the
-    // max band count, which must be >= 2 for the straddling pair.
-    auto bands_at = [&](int x) {
-        int bands = 0; bool prev = false;
-        for (int y = 0; y < sz.height(); ++y) {
-            QColor c = img.pixelColor(x, y);
-            const bool filled = c.red() < 220 || c.green() < 220 || c.blue() < 220;
-            if (filled && !prev) ++bands;
-            prev = filled;
+    // Count non-background pixels in a central INTERIOR disk (radius < ~32% of the
+    // image half-size) -- the circle lives here; the outer ring bonds are farther
+    // out. A Kekule/single benzene would leave this interior empty.
+    const int cx = sz.width() / 2, cy = sz.height() / 2;
+    const int rmax = static_cast<int>(0.32 * sz.width() / 2);
+    int interior = 0;
+    for (int y = cy - rmax; y <= cy + rmax; ++y)
+        for (int x = cx - rmax; x <= cx + rmax; ++x) {
+            const int dx = x - cx, dy = y - cy;
+            if (dx * dx + dy * dy > rmax * rmax) continue;
+            QColor c2 = img.pixelColor(x, y);
+            if (c2.red() < 220 || c2.green() < 220 || c2.blue() < 220) ++interior;
         }
-        return bands;
-    };
-    int max_bands = 0;
-    for (int x = sz.width() / 2 - 8; x <= sz.width() / 2 + 8; ++x)
-        max_bands = std::max(max_bands, bands_at(x));
-    EXPECT_GE(max_bands, 2)
-        << "aromatic bond should show two separated lines (solid + dashed), bands="
-        << max_bands;
+    EXPECT_GT(interior, 20) << "expected a dashed circle inside the aromatic ring";
 }
 
 TEST(BondOrderRenderTest, DoubleBondNotMuchWiderThanSingle) {

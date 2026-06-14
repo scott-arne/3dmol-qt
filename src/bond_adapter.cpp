@@ -53,7 +53,9 @@ constexpr float TRIPLE_OFFSET = 0.75f;       // triple outer offset / R  (3dmol:
 // each aromatic ring. Tuned visually on benzene.
 constexpr float RING_CIRCLE_FRACTION = 0.6f;   // circle radius / ring apothem (sits inside bonds)
 constexpr float RING_CIRCLE_TUBE_FRAC = 0.55f; // circle tube radius / bond radius (thinner than bonds)
-constexpr int   CIRCLE_SEGMENTS = 48;          // chords around the circle
+constexpr int   CIRCLE_SEGMENTS = 24;          // chords around the circle; every
+                                               // other one is drawn -> 12 visible
+                                               // dashes (clearly dashed, not solid)
 
 // Accumulate the neighbor of `atom` (other than `exclude`) whose bond is MOST
 // perpendicular to `axis` -- the largest cross-product magnitude. This is 3dmol's
