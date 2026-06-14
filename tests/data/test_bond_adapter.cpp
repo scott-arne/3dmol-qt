@@ -260,62 +260,85 @@ TEST(BondAdapterTest, DoubleBondWithNoNeighborStillRenders) {
     EXPECT_EQ(b.size(), 4u);  // still two parallel lines, no crash
 }
 
-TEST(BondAdapterTest, AromaticBondIsSymmetricSolidPlusDashedPair) {
-    // Aromatic bonds render like a double bond (3dmol's default): a symmetric
-    // pair of thin lines straddling the bond axis -- one SOLID outer line and one
-    // thinner DASHED inner line (toward the ring interior). The dashed line is a
-    // series of short segments. Bond c1=c2 along +x through the origin; neighbor
-    // c3 puts the ring interior on the +y side.
+TEST(BondAdapterTest, DelocalizedBenzeneHasFullBondsPlusThinnerCircle) {
+    // Delocalized aromatic style on a benzene ring: the 6 ring BONDS render as
+    // full-radius single cylinders (12 half-bonds at radius r), PLUS a dashed
+    // circle of THINNER chord segments inside the ring. Verify the circle
+    // segments are thinner than the bonds and lie inside the atom ring.
     OEChem::OEGraphMol mol;
-    OEChem::OEAtomBase* c1 = mol.NewAtom(6);
-    OEChem::OEAtomBase* c2 = mol.NewAtom(6);
-    OEChem::OEAtomBase* c3 = mol.NewAtom(6);  // neighbor on c1 -> defines interior (+y)
-    double p1[3] = {0, 0, 0};
-    double p2[3] = {1.4, 0, 0};
-    double p3[3] = {-0.7, 1.2, 0};
-    mol.SetCoords(c1, p1); mol.SetCoords(c2, p2); mol.SetCoords(c3, p3);
-    OEChem::OEBondBase* bond = mol.NewBond(c1, c2, 1);
-    bond->SetAromatic(true);
-    c1->SetAromatic(true);
-    c2->SetAromatic(true);
-    mol.NewBond(c1, c3, 1);
+    OEChem::OEAtomBase* c[6];
+    const double R = 1.4;
+    for (int i = 0; i < 6; ++i) {
+        c[i] = mol.NewAtom(6);
+        const double a = (M_PI / 3.0) * i;
+        double p[3] = {R * std::cos(a), R * std::sin(a), 0.0};
+        mol.SetCoords(c[i], p);
+    }
+    for (int i = 0; i < 6; ++i) {
+        OEChem::OEBondBase* b = mol.NewBond(c[i], c[(i + 1) % 6], (i % 2 == 0) ? 2 : 1);
+        b->SetAromatic(true);
+        c[i]->SetAromatic(true);
+    }
 
-    StickStyle style;  // radius 0.25
-    style.aromatic_style(AromaticStyle::Delocalized);  // default is now Kekule
+    StickStyle style;
+    style.aromatic_style(AromaticStyle::Delocalized);
     const float r = 0.25f;
-    const float sub = r * 0.4f;       // solid line radius = R * doubleBondScale
-    const float dash_r = sub * 0.5f;  // dashed line radius = sub * AROMATIC_DASH_RADIUS_FRAC
-    const float offset = r * 0.6f;    // line offset from axis = R * DOUBLE_OFFSET
     BondData b = build_bond_data(as_base(mol), style);
 
-    // Collect aromatic-bond (idx 0) half-bonds by radius class. The single c1-c3
-    // bond (idx 1) contributes 2 half-bonds at full radius; ignore it here.
-    int solid_halves = 0, dash_halves = 0;
-    float solid_y = 0.0f, dash_y = 0.0f;
+    int full = 0, thin = 0;
+    float max_thin_dist = 0.0f;  // circle chord distance from ring center (origin)
     for (std::size_t i = 0; i < b.size(); ++i) {
-        if (b.source_bond_idx[i] != 0u) continue;
-        if (std::abs(b.radii[i] - sub) < 1e-4f) {
-            ++solid_halves;
-            solid_y = b.starts[i].y();  // all share the same offset sign
-        } else if (std::abs(b.radii[i] - dash_r) < 1e-4f) {
-            ++dash_halves;
-            dash_y += b.starts[i].y();
+        if (std::abs(b.radii[i] - r) < 1e-4f) {
+            ++full;
+        } else if (b.radii[i] < r - 1e-4f) {
+            ++thin;
+            max_thin_dist = std::max(max_thin_dist, b.starts[i].length());
+            // circle lies in the ring plane (z ~ 0 for this xy-planar benzene)
+            EXPECT_NEAR(b.starts[i].z(), 0.0f, 1e-3f);
         }
     }
-    // Solid line = one full line split into 2 half-bonds.
-    EXPECT_EQ(solid_halves, 2) << "expected one solid outer line (2 half-bonds)";
-    // Dashed line = MANY short segments (more than a single split line's 2).
-    EXPECT_GT(dash_halves, 2) << "dashed inner line should be multiple segments";
+    EXPECT_EQ(full, 12) << "6 aromatic ring bonds -> 12 full-radius half-bonds";
+    EXPECT_GT(thin, 4) << "dashed circle should add multiple thin chord segments";
+    // The circle sits INSIDE the atoms: every chord vertex is closer to center
+    // than the atoms (R = 1.4).
+    EXPECT_LT(max_thin_dist, static_cast<float>(R))
+        << "circle must lie inside the atom ring";
+}
 
-    // Symmetric straddle: solid and dashed are on OPPOSITE sides of the axis, at
-    // ~the same offset magnitude. The dashed line is toward the +y interior.
-    EXPECT_NEAR(std::abs(solid_y), offset, 1e-3f) << "solid line offset wrong";
-    EXPECT_GT(dash_y, 0.0f) << "dashed inner line should be on the +y (interior) side";
-    EXPECT_LT(solid_y, 0.0f) << "solid outer line should be on the opposite side";
+TEST(BondAdapterTest, DelocalizedFusedRingsYieldTwoCircles) {
+    // Fused bicyclic aromatic (two rings sharing an edge) -> two distinct circles.
+    // Build naphthalene-like fused 6+6 sharing the c0-c1 edge, all aromatic.
+    OEChem::OEGraphMol mol;
+    // Ring A: c0..c5 hexagon; Ring B shares edge c0-c1, adds c6..c9.
+    OEChem::OEAtomBase* a[10];
+    // Simple planar coords: ring A centered at x=-0.7, ring B at x=+0.7 (shared edge at x=0).
+    double coords[10][3] = {
+        { 0.0,  0.7, 0}, { 0.0, -0.7, 0},        // shared edge c0(top), c1(bottom)
+        {-1.2,  1.4, 0}, {-2.4,  0.7, 0}, {-2.4, -0.7, 0}, {-1.2, -1.4, 0},  // ring A c2..c5
+        { 1.2,  1.4, 0}, { 2.4,  0.7, 0}, { 2.4, -0.7, 0}, { 1.2, -1.4, 0},  // ring B c6..c9
+    };
+    for (int i = 0; i < 10; ++i) { a[i] = mol.NewAtom(6); mol.SetCoords(a[i], coords[i]); a[i]->SetAromatic(true); }
+    auto bond = [&](int i, int j) { OEChem::OEBondBase* b = mol.NewBond(a[i], a[j], 1); b->SetAromatic(true); };
+    bond(0, 1);                                   // shared edge
+    bond(0, 2); bond(2, 3); bond(3, 4); bond(4, 5); bond(5, 1);  // ring A
+    bond(0, 6); bond(6, 7); bond(7, 8); bond(8, 9); bond(9, 1);  // ring B
 
-    // Both lines are thinner than a full single bond (they fit within its width).
-    EXPECT_LT(sub, r);
-    EXPECT_LT(dash_r, sub);
+    StickStyle style;
+    style.aromatic_style(AromaticStyle::Delocalized);
+    const float r = 0.25f;
+    BondData b = build_bond_data(as_base(mol), style);
+
+    // Collect thin (circle) chord vertices and cluster by x-sign: ring A is at
+    // x<0, ring B at x>0. Both clusters must be non-empty -> two circles drawn.
+    int left = 0, right = 0;
+    for (std::size_t i = 0; i < b.size(); ++i) {
+        if (b.radii[i] < r - 1e-4f) {  // a circle chord
+            if (b.starts[i].x() < -0.2f) ++left;
+            else if (b.starts[i].x() > 0.2f) ++right;
+        }
+    }
+    EXPECT_GT(left, 0) << "ring A circle missing";
+    EXPECT_GT(right, 0) << "ring B circle missing";
 }
 
 TEST(BondAdapterTest, KekuleAromaticRingRendersAlternatingSingleDouble) {
