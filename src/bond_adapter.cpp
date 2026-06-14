@@ -4,6 +4,7 @@
 #include "oe3dmol/data_errors.h"
 
 #include <algorithm>
+#include <cmath>
 #include <map>
 #include <queue>
 #include <set>
@@ -53,6 +54,11 @@ constexpr float TRIPLE_OFFSET = 0.75f;       // triple outer offset / R  (3dmol:
 constexpr float AROMATIC_DASH_RADIUS_FRAC = 0.5f;  // dashed line radius / solid line radius
 constexpr float DASH_LENGTH = 0.10f;  // 3dmol dashedBondConfig.dashLength
 constexpr float DASH_GAP = 0.25f;     // 3dmol dashedBondConfig.gapLength
+// Aromatic delocalized circle (Delocalized style): a thin dashed ring inside
+// each aromatic ring. Tuned visually on benzene.
+constexpr float RING_CIRCLE_FRACTION = 0.6f;   // circle radius / ring apothem (sits inside bonds)
+constexpr float RING_CIRCLE_TUBE_FRAC = 0.55f; // circle tube radius / bond radius (thinner than bonds)
+constexpr int   CIRCLE_SEGMENTS = 48;          // chords around the circle
 
 // Accumulate the neighbor of `atom` (other than `exclude`) whose bond is MOST
 // perpendicular to `axis` -- the largest cross-product magnitude. This is 3dmol's
@@ -205,6 +211,56 @@ std::vector<std::vector<const OEChem::OEAtomBase*>> aromatic_rings(
         }
     }
     return rings;
+}
+
+// Emit a dashed circle inside one aromatic ring as short cylinder chords. The
+// circle lies in the ring's mean plane (Newell normal), centered on the ring
+// centroid, at RING_CIRCLE_FRACTION of the apothem so it sits clearly inside the
+// bonds, with a tube radius thinner than the bonds. Dashed by drawing every
+// other chord. No-op for degenerate (near-collinear) rings.
+void add_aromatic_circle(BondData& data, const std::vector<QVector3D>& ring_pos,
+                         float bond_radius, const Color& color, unsigned bond_index) {
+    const std::size_t n = ring_pos.size();
+    if (n < 3) return;
+    QVector3D centroid(0, 0, 0);
+    for (const QVector3D& p : ring_pos) centroid += p;
+    centroid /= static_cast<float>(n);
+
+    // Newell's method for a robust plane normal over the ordered cycle.
+    QVector3D normal(0, 0, 0);
+    for (std::size_t i = 0; i < n; ++i) {
+        const QVector3D& cur = ring_pos[i];
+        const QVector3D& nxt = ring_pos[(i + 1) % n];
+        normal += QVector3D(
+            (cur.y() - nxt.y()) * (cur.z() + nxt.z()),
+            (cur.z() - nxt.z()) * (cur.x() + nxt.x()),
+            (cur.x() - nxt.x()) * (cur.y() + nxt.y()));
+    }
+    if (normal.lengthSquared() < 1.0e-8f) return;  // degenerate ring
+    normal.normalize();
+
+    float avg_dist = 0.0f;
+    for (const QVector3D& p : ring_pos) avg_dist += (p - centroid).length();
+    avg_dist /= static_cast<float>(n);
+    const float apothem = avg_dist * std::cos(static_cast<float>(M_PI) / static_cast<float>(n));
+    const float circle_r = RING_CIRCLE_FRACTION * apothem;
+    const float tube_r = RING_CIRCLE_TUBE_FRAC * bond_radius;
+
+    // In-plane orthonormal basis (u, v).
+    QVector3D u = QVector3D::crossProduct(normal, QVector3D(0, 0, 1));
+    if (u.lengthSquared() < 1.0e-6f) u = QVector3D::crossProduct(normal, QVector3D(0, 1, 0));
+    u.normalize();
+    const QVector3D v = QVector3D::crossProduct(normal, u);
+
+    auto pt = [&](int i) {
+        const float t = (2.0f * static_cast<float>(M_PI) * static_cast<float>(i)) /
+                        static_cast<float>(CIRCLE_SEGMENTS);
+        return centroid + circle_r * (std::cos(t) * u + std::sin(t) * v);
+    };
+    // Dashed: draw every other chord segment.
+    for (int i = 0; i < CIRCLE_SEGMENTS; i += 2) {
+        data.add(pt(i), pt(i + 1), tube_r, color, bond_index);
+    }
 }
 
 }  // namespace
