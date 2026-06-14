@@ -36,31 +36,103 @@ void add_line(BondData& data, const QVector3D& a, const QVector3D& b, float radi
     data.add(b, mid, radius, color_b, bond_index);
 }
 
-// Multi-bond geometry (in units of the stick radius; tuned visually on benzene
-// + carbonyls). Offsets are small fractions of the radius so the parallel lines
-// of a double/triple sit close together and read as ONE bond that is split, with
-// total width close to a single stick -- not as widely separated detached bars.
-constexpr float OFFSET_FACTOR = 0.7f;         // double side offset
-constexpr float TRIPLE_OFFSET_FACTOR = 1.1f;  // outer offset for triples
-constexpr float MULTI_RADIUS_FRAC = 0.55f;    // thinner sub-cylinders for double/triple
-constexpr float INNER_LEN_FRAC = 0.6f;        // aromatic inner line length fraction
-constexpr float INNER_RADIUS_FRAC = 0.5f;     // aromatic inner line radius fraction
-// The aromatic main line is a FULL-radius cylinder (unlike the thin double-bond
-// sub-cylinders), so the inner line needs a larger offset to clear it and stay
-// visible as a distinct inner ring instead of being swallowed by the main bond.
-constexpr float AROMATIC_INNER_OFFSET_FACTOR = 1.6f;
+// Multi-bond geometry, ported from 3dmol.js (drawBondSticks defaults). A
+// multi-bond's parallel lines fit within a single bond's footprint: each line is
+// a thin sub-cylinder and the pair straddles the axis so the whole reads as one
+// split bond. Values are 3dmol's doubleBondScaling=0.4 / tripleBondScaling=0.25.
+constexpr float DOUBLE_BOND_SCALE = 0.4f;    // double sub-cylinder radius / R
+constexpr float TRIPLE_BOND_SCALE = 0.25f;   // triple sub-cylinder radius / R
+constexpr float DOUBLE_OFFSET = 0.6f;        // double line offset / R   (3dmol: r*1.5)
+constexpr float TRIPLE_OFFSET = 0.75f;       // triple outer offset / R  (3dmol: r*3)
+// Aromatic = a double-like straddling pair: a solid outer line + a thinner DASHED
+// inner line toward the ring interior (3dmol's default "dashed" aromaticStyle).
+constexpr float AROMATIC_DASH_RADIUS_FRAC = 0.5f;  // dashed line radius / solid line radius
+constexpr float DASH_LENGTH = 0.10f;  // 3dmol dashedBondConfig.dashLength
+constexpr float DASH_GAP = 0.25f;     // 3dmol dashedBondConfig.gapLength
 
-// Position of any atom bonded to `atom` other than `exclude`, written to `out`.
-// Returns false if `atom` has no such neighbor.
-bool first_other_neighbor(const OEChem::OEMolBase* mol, const OEChem::OEAtomBase* atom,
-                          const OEChem::OEAtomBase* exclude, QVector3D& out) {
+// Accumulate the neighbor of `atom` (other than `exclude`) whose bond is MOST
+// perpendicular to `axis` -- the largest cross-product magnitude. This is 3dmol's
+// getGoodCross criterion: the most-divergent neighbor gives a well-conditioned,
+// in-molecular-plane offset direction for multi-bond lines, avoiding the
+// near-collinear (degenerate) neighbors that make offsets jitter around fused
+// rings. Updates `best`/`out` in place; call for both bond atoms.
+void accumulate_divergent_neighbor(const OEChem::OEMolBase* mol,
+                                   const OEChem::OEAtomBase* atom,
+                                   const OEChem::OEAtomBase* exclude,
+                                   const QVector3D& axis, float& best, QVector3D& out) {
+    const QVector3D p = atom_pos(mol, atom);
     for (OESystem::OEIter nbr = atom->GetAtoms(); nbr; ++nbr) {
         const OEChem::OEAtomBase* n = nbr;
         if (n == exclude) continue;
-        out = atom_pos(mol, n);
-        return true;
+        const QVector3D np = atom_pos(mol, n);
+        const float l = QVector3D::crossProduct(np - p, axis).lengthSquared();
+        if (l > best) {
+            best = l;
+            out = np;
+        }
     }
-    return false;
+}
+
+// Emit a dashed line from `a` to `b` as a series of short cylinder segments,
+// ported from 3dmol's calculateDashes (dash 0.1 A, gap 0.25 A + 2*radius,
+// end-padded and centered). Each segment is colored by the near atom, split at
+// `color_mid` (the line's own midpoint). Used for the aromatic inner line.
+void add_dashed_line(BondData& data, const QVector3D& a, const QVector3D& b, float radius,
+                     const Color& color_a, const Color& color_b, const QVector3D& color_mid,
+                     unsigned bond_index) {
+    const QVector3D axis = b - a;
+    const float len = axis.length();
+    if (len < 1.0e-3f) {
+        return;
+    }
+    const QVector3D dir = axis / len;
+    auto seg_color = [&](const QVector3D& s, const QVector3D& e) {
+        const QVector3D m = (s + e) * 0.5f;
+        return QVector3D::dotProduct(m - color_mid, dir) < 0.0f ? color_a : color_b;
+    };
+    const float eff_gap = DASH_GAP + 2.0f * radius;
+    const float end_pad = eff_gap * 0.5f;
+    const float drawable = len - 2.0f * end_pad;
+    if (drawable < DASH_LENGTH) {  // too short for dashes: one solid segment
+        data.add(a, b, radius, seg_color(a, b), bond_index);
+        return;
+    }
+    const int num = static_cast<int>((drawable - DASH_LENGTH) / (DASH_LENGTH + eff_gap)) + 1;
+    const int gaps = num > 1 ? num - 1 : 0;
+    const float remaining = drawable - num * DASH_LENGTH;
+    const float internal_gap = gaps > 0 ? remaining / (gaps + 1) : remaining;
+    const float start = end_pad + internal_gap * 0.5f;
+    for (int i = 0; i < num; ++i) {
+        const float s = start + i * (DASH_LENGTH + internal_gap);
+        const QVector3D ps = a + dir * s;
+        const QVector3D pe = a + dir * (s + DASH_LENGTH);
+        data.add(ps, pe, radius, seg_color(ps, pe), bond_index);
+    }
+}
+
+// Choose which side of the bond (+off or -off) the aromatic dashed inner line
+// goes: toward the average direction of the bond atoms' OTHER neighbors, which
+// points into the ring interior. Port of 3dmol's chooseDashedPlusV. Returns +1
+// for the +off side, -1 for the -off side.
+float aromatic_dash_sign(const OEChem::OEMolBase* mol, const OEChem::OEAtomBase* abgn,
+                         const OEChem::OEAtomBase* aend, const QVector3D& mid,
+                         const QVector3D& off) {
+    QVector3D center(0, 0, 0);
+    int count = 0;
+    for (const OEChem::OEAtomBase* a : {abgn, aend}) {
+        const OEChem::OEAtomBase* other = (a == abgn) ? aend : abgn;
+        for (OESystem::OEIter nbr = a->GetAtoms(); nbr; ++nbr) {
+            const OEChem::OEAtomBase* n = nbr;
+            if (n == other) continue;
+            center += atom_pos(mol, n);
+            ++count;
+        }
+    }
+    if (count == 0) {
+        return -1.0f;  // no neighbors: arbitrary (interior is undefined)
+    }
+    center /= static_cast<float>(count);
+    return QVector3D::dotProduct(off, center - mid) > 0.0f ? 1.0f : -1.0f;
 }
 
 }  // namespace
@@ -120,38 +192,42 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
             continue;
         }
 
-        // Offset direction: perpendicular to the bond, toward a neighbor atom so
-        // the extra lines lie in the molecular plane / ring interior.
-        QVector3D ref;
-        if (!first_other_neighbor(mol, abgn, aend, ref) &&
-            !first_other_neighbor(mol, aend, abgn, ref)) {
-            ref = p_bgn + QVector3D(0, 1, 0);  // arbitrary; bond_offset_dir falls back
-        }
-        const QVector3D off = bond_offset_dir(p_end - p_bgn, ref - p_bgn);
+        // Offset direction: perpendicular to the bond, toward the MOST-divergent
+        // neighbor across both atoms (3dmol's getGoodCross). This lies in the
+        // molecular plane / ring interior and is well-conditioned even in fused
+        // rings, where the first neighbor is often near-collinear.
+        const QVector3D axis = p_end - p_bgn;
+        float best = -1.0f;
+        QVector3D ref = p_bgn + QVector3D(0, 1, 0);  // fallback; bond_offset_dir handles it
+        accumulate_divergent_neighbor(mol, abgn, aend, axis, best, ref);
+        accumulate_divergent_neighbor(mol, aend, abgn, axis, best, ref);
+        const QVector3D off = bond_offset_dir(axis, ref - p_bgn);
+        const QVector3D mid = (p_bgn + p_end) * 0.5f;
 
         if (aromatic) {
-            // Main full-length line on the bond axis.
-            add_line(data, p_bgn, p_end, radius, c_bgn, c_end, idx);
-            // Inner line: offset toward the ring interior, shorter (about the
-            // midpoint) and thinner -> 3dmol's aromatic "inner ring" look. Uses a
-            // larger offset than double bonds so it clears the full-radius main.
-            const QVector3D d = off * (AROMATIC_INNER_OFFSET_FACTOR * radius);
-            const QVector3D mid = (p_bgn + p_end) * 0.5f;
-            const QVector3D half = (p_end - p_bgn) * (0.5f * INNER_LEN_FRAC);
-            const QVector3D ia = mid - half + d;
-            const QVector3D ib = mid + half + d;
-            add_line(data, ia, ib, radius * INNER_RADIUS_FRAC, c_bgn, c_end, idx);
+            // Symmetric straddling pair (like a double bond): a SOLID outer line
+            // and a thinner DASHED inner line toward the ring interior -- 3dmol's
+            // default aromatic look.
+            const float sub_radius = radius * DOUBLE_BOND_SCALE;
+            const QVector3D d = off * (DOUBLE_OFFSET * radius);
+            const float dash_sign = aromatic_dash_sign(mol, abgn, aend, mid, off);
+            const QVector3D solid_d = d * -dash_sign;  // solid on the outer side
+            const QVector3D dash_d = d * dash_sign;    // dashed toward ring interior
+            add_line(data, p_bgn + solid_d, p_end + solid_d, sub_radius, c_bgn, c_end, idx);
+            add_dashed_line(data, p_bgn + dash_d, p_end + dash_d,
+                            sub_radius * AROMATIC_DASH_RADIUS_FRAC, c_bgn, c_end, mid + dash_d, idx);
             continue;
         }
 
-        const float sub_radius = radius * MULTI_RADIUS_FRAC;
         if (order == 2) {
-            // Two thinner cylinders offset symmetrically; together ~one bond wide.
-            const QVector3D d = off * (OFFSET_FACTOR * radius);
+            // Two thin cylinders straddling the axis; together ~one bond wide.
+            const float sub_radius = radius * DOUBLE_BOND_SCALE;
+            const QVector3D d = off * (DOUBLE_OFFSET * radius);
             add_line(data, p_bgn + d, p_end + d, sub_radius, c_bgn, c_end, idx);
             add_line(data, p_bgn - d, p_end - d, sub_radius, c_bgn, c_end, idx);
         } else {  // order >= 3: triple (defensive: treat >3 as triple)
-            const QVector3D d = off * (TRIPLE_OFFSET_FACTOR * radius);
+            const float sub_radius = radius * TRIPLE_BOND_SCALE;
+            const QVector3D d = off * (TRIPLE_OFFSET * radius);
             add_line(data, p_bgn, p_end, sub_radius, c_bgn, c_end, idx);
             add_line(data, p_bgn + d, p_end + d, sub_radius, c_bgn, c_end, idx);
             add_line(data, p_bgn - d, p_end - d, sub_radius, c_bgn, c_end, idx);

@@ -260,13 +260,16 @@ TEST(BondAdapterTest, DoubleBondWithNoNeighborStillRenders) {
     EXPECT_EQ(b.size(), 4u);  // still two parallel lines, no crash
 }
 
-TEST(BondAdapterTest, AromaticBondYieldsMainPlusShorterThinnerInnerLine) {
-    // Build a 3-atom fragment, mark the central bond aromatic, give a neighbor
-    // so the inner line offsets toward the ring interior.
+TEST(BondAdapterTest, AromaticBondIsSymmetricSolidPlusDashedPair) {
+    // Aromatic bonds render like a double bond (3dmol's default): a symmetric
+    // pair of thin lines straddling the bond axis -- one SOLID outer line and one
+    // thinner DASHED inner line (toward the ring interior). The dashed line is a
+    // series of short segments. Bond c1=c2 along +x through the origin; neighbor
+    // c3 puts the ring interior on the +y side.
     OEChem::OEGraphMol mol;
     OEChem::OEAtomBase* c1 = mol.NewAtom(6);
     OEChem::OEAtomBase* c2 = mol.NewAtom(6);
-    OEChem::OEAtomBase* c3 = mol.NewAtom(6);  // neighbor on c1
+    OEChem::OEAtomBase* c3 = mol.NewAtom(6);  // neighbor on c1 -> defines interior (+y)
     double p1[3] = {0, 0, 0};
     double p2[3] = {1.4, 0, 0};
     double p3[3] = {-0.7, 1.2, 0};
@@ -279,45 +282,39 @@ TEST(BondAdapterTest, AromaticBondYieldsMainPlusShorterThinnerInnerLine) {
 
     StickStyle style;  // radius 0.25
     const float r = 0.25f;
+    const float sub = r * 0.4f;       // solid line radius = R * doubleBondScale
+    const float dash_r = sub * 0.5f;  // dashed line radius = sub * AROMATIC_DASH_RADIUS_FRAC
+    const float offset = r * 0.6f;    // line offset from axis = R * DOUBLE_OFFSET
     BondData b = build_bond_data(as_base(mol), style);
 
-    // Aromatic bond (idx 0) -> main pair (2) + inner pair (2) = 4 half-bonds.
-    // Plus the single c1-c3 bond (idx 1) -> 2. Total 6.
-    EXPECT_EQ(b.size(), 6u);
-
-    // Among bond idx 0 half-bonds, the MAIN line uses radius r; the INNER line
-    // uses a smaller radius. Collect distinct radii for bond 0.
-    bool has_main_radius = false, has_inner_radius = false;
-    float main_len_sq = 0.0f, inner_len_sq = 1e9f;
+    // Collect aromatic-bond (idx 0) half-bonds by radius class. The single c1-c3
+    // bond (idx 1) contributes 2 half-bonds at full radius; ignore it here.
+    int solid_halves = 0, dash_halves = 0;
+    float solid_y = 0.0f, dash_y = 0.0f;
     for (std::size_t i = 0; i < b.size(); ++i) {
         if (b.source_bond_idx[i] != 0u) continue;
-        if (std::abs(b.radii[i] - r) < 1e-4f) has_main_radius = true;
-        if (b.radii[i] < r - 1e-4f) has_inner_radius = true;
-        const float seg = (b.ends[i] - b.starts[i]).lengthSquared();  // half-line length^2
-        if (std::abs(b.radii[i] - r) < 1e-4f) main_len_sq = std::max(main_len_sq, seg);
-        else inner_len_sq = std::min(inner_len_sq, seg);
-    }
-    EXPECT_TRUE(has_main_radius);   // main line at full radius
-    EXPECT_TRUE(has_inner_radius);  // inner line is thinner
-    EXPECT_LT(inner_len_sq, main_len_sq);  // inner line is shorter
-
-    // The inner line must CLEAR the full-radius main cylinder, otherwise it is
-    // swallowed by the main bond and invisible (the "consumed inner ring" bug).
-    // The bond runs along +x through the origin, so the main cylinder occupies
-    // |perp| <= r around the x-axis; the inner line is offset toward the neighbor
-    // (here +y). Its perpendicular distance from the axis (max |y| of its
-    // half-bonds) must exceed r so it pokes clear of the main cylinder.
-    float inner_perp = 0.0f;
-    for (std::size_t i = 0; i < b.size(); ++i) {
-        if (b.source_bond_idx[i] != 0u) continue;
-        if (b.radii[i] < r - 1e-4f) {  // inner (thinner) half-bonds
-            inner_perp = std::max(inner_perp, std::abs(b.starts[i].y()));
-            inner_perp = std::max(inner_perp, std::abs(b.ends[i].y()));
+        if (std::abs(b.radii[i] - sub) < 1e-4f) {
+            ++solid_halves;
+            solid_y = b.starts[i].y();  // all share the same offset sign
+        } else if (std::abs(b.radii[i] - dash_r) < 1e-4f) {
+            ++dash_halves;
+            dash_y += b.starts[i].y();
         }
     }
-    EXPECT_GT(inner_perp, r)
-        << "aromatic inner line is buried in the full-radius main cylinder "
-        << "(inner offset " << inner_perp << " <= radius " << r << ")";
+    // Solid line = one full line split into 2 half-bonds.
+    EXPECT_EQ(solid_halves, 2) << "expected one solid outer line (2 half-bonds)";
+    // Dashed line = MANY short segments (more than a single split line's 2).
+    EXPECT_GT(dash_halves, 2) << "dashed inner line should be multiple segments";
+
+    // Symmetric straddle: solid and dashed are on OPPOSITE sides of the axis, at
+    // ~the same offset magnitude. The dashed line is toward the +y interior.
+    EXPECT_NEAR(std::abs(solid_y), offset, 1e-3f) << "solid line offset wrong";
+    EXPECT_GT(dash_y, 0.0f) << "dashed inner line should be on the +y (interior) side";
+    EXPECT_LT(solid_y, 0.0f) << "solid outer line should be on the opposite side";
+
+    // Both lines are thinner than a full single bond (they fit within its width).
+    EXPECT_LT(sub, r);
+    EXPECT_LT(dash_r, sub);
 }
 
 }  // namespace test

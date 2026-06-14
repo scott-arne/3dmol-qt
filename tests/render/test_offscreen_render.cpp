@@ -824,52 +824,57 @@ TEST(BondOrderRenderTest, DoubleBondShowsTwoSeparatedCylinders) {
                         << bands << ")";
 }
 
-TEST(BondOrderRenderTest, AromaticRingShowsInnerLines) {
-    // Build benzene in-code (planar hexagon) and flag the ring aromatic, so the
-    // aromatic inner-line path is exercised without any external fixture. The
-    // aromatic render must draw MORE bond pixels than a forced-single render
-    // because the inner ring lines add pixels.
+TEST(BondOrderRenderTest, AromaticBondShowsTwoSeparatedLines) {
+    // An aromatic bond renders like a double bond: a symmetric pair of thin lines
+    // straddling the axis (solid outer + dashed inner), so a scan perpendicular to
+    // the bond crosses TWO filled bands with a background gap between them -- not
+    // one fat single cylinder. Build a single horizontal aromatic bond (face-on)
+    // with a neighbor so the offset plane is in-screen; offset is vertical.
+    const QSize sz(256, 256);
+    RhiContext ctx(sz);
     OEChem::OEGraphMol mol;
-    OEChem::OEAtomBase* c[6];
-    const double R = 1.397;  // benzene C-C ring radius (Angstrom)
-    for (int i = 0; i < 6; ++i) {
-        c[i] = mol.NewAtom(6);
-        const double ang = (M_PI / 3.0) * i;
-        double p[3] = {R * std::cos(ang), R * std::sin(ang), 0.0};
-        mol.SetCoords(c[i], p);
-    }
-    for (int i = 0; i < 6; ++i) {
-        OEChem::OEBondBase* bond = mol.NewBond(c[i], c[(i + 1) % 6], (i % 2 == 0) ? 2 : 1);
-        bond->SetAromatic(true);
-        c[i]->SetAromatic(true);
-    }
+    OEChem::OEAtomBase* c1 = mol.NewAtom(6);
+    OEChem::OEAtomBase* c2 = mol.NewAtom(6);
+    OEChem::OEAtomBase* c3 = mol.NewAtom(6);  // neighbor -> in-plane offset (+y)
+    double p1[3] = {-0.7, 0, 0}, p2[3] = {0.7, 0, 0}, p3[3] = {-1.4, 0.7, 0};
+    mol.SetCoords(c1, p1); mol.SetCoords(c2, p2); mol.SetCoords(c3, p3);
+    OEChem::OEBondBase* bd = mol.NewBond(c1, c2, 1);
+    bd->SetAromatic(true);
+    c1->SetAromatic(true); c2->SetAromatic(true);
+    mol.NewBond(c1, c3, 1);
     const OEChem::OEMolBase& base = mol;
 
-    const QSize sz(400, 400);
-    auto bond_pixels = [&](const StickStyle& style) {
-        RhiContext ctx(sz);
-        BondData bonds = build_bond_data(&base, style);
-        AtomData none;
-        SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
-        renderer.set_geometry(none, bonds);
-        Camera cam; cam.zoom_to(bonds.bounds);
-        QImage img = ctx.render_frame(QColor(255, 255, 255), [&](QRhiCommandBuffer* cb) {
-            renderer.draw(cb, cam, sz);
-        });
-        EXPECT_FALSE(img.isNull());
-        int n = 0;
-        for (int y = 0; y < sz.height(); ++y)
-            for (int xx = 0; xx < sz.width(); ++xx) {
-                QColor c2 = img.pixelColor(xx, y);
-                if (c2.red() < 230 || c2.green() < 230 || c2.blue() < 230) ++n;  // non-bg
-            }
-        return n;
+    BondData bonds = build_bond_data(&base, StickStyle{}.radius(0.10));
+    AtomData none;
+    SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
+    renderer.set_geometry(none, bonds);
+    Camera cam; cam.zoom_to(bonds.bounds);
+    QImage img = ctx.render_frame(QColor(255, 255, 255), [&](QRhiCommandBuffer* cb) {
+        renderer.draw(cb, cam, sz);
+    });
+    ASSERT_FALSE(img.isNull());
+
+    // Scan the central column (x = width/2, where the bond crosses) vertically and
+    // count filled bands. The solid line + the dashed line (where a dash lands at
+    // center) read as two separate bands; even if a dash gap falls on this column,
+    // the next column over catches it -- so scan a few central columns and take the
+    // max band count, which must be >= 2 for the straddling pair.
+    auto bands_at = [&](int x) {
+        int bands = 0; bool prev = false;
+        for (int y = 0; y < sz.height(); ++y) {
+            QColor c = img.pixelColor(x, y);
+            const bool filled = c.red() < 220 || c.green() < 220 || c.blue() < 220;
+            if (filled && !prev) ++bands;
+            prev = filled;
+        }
+        return bands;
     };
-    const int aromatic_px = bond_pixels(StickStyle{});                   // inner lines on
-    const int single_px = bond_pixels(StickStyle{}.single_bonds(true));  // forced single
-    EXPECT_GT(aromatic_px, single_px)
-        << "aromatic inner lines should add bond pixels (aromatic=" << aromatic_px
-        << " single=" << single_px << ")";
+    int max_bands = 0;
+    for (int x = sz.width() / 2 - 8; x <= sz.width() / 2 + 8; ++x)
+        max_bands = std::max(max_bands, bands_at(x));
+    EXPECT_GE(max_bands, 2)
+        << "aromatic bond should show two separated lines (solid + dashed), bands="
+        << max_bands;
 }
 
 TEST(BondOrderRenderTest, DoubleBondNotMuchWiderThanSingle) {
