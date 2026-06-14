@@ -4,7 +4,11 @@
 #include "oe3dmol/data_errors.h"
 
 #include <algorithm>
+#include <map>
+#include <queue>
+#include <set>
 #include <string>
+#include <vector>
 
 #include <oechem.h>
 
@@ -133,6 +137,74 @@ float aromatic_dash_sign(const OEChem::OEMolBase* mol, const OEChem::OEAtomBase*
     }
     center /= static_cast<float>(count);
     return QVector3D::dotProduct(off, center - mid) > 0.0f ? 1.0f : -1.0f;
+}
+
+// Smallest aromatic rings as ordered atom cycles. Ported from 3dmol's
+// findSmallestRing: for each aromatic bond, BFS from one endpoint back to the
+// other through ONLY aromatic bonds (bounded to <=8-membered rings), recovering
+// the shortest cycle; dedup rings by their sorted atom-index set so a fused
+// system (e.g. indazole) yields one cycle PER smallest ring. OE exposes no
+// smallest-ring atom-list enumerator, so we walk the bond graph ourselves.
+std::vector<std::vector<const OEChem::OEAtomBase*>> aromatic_rings(
+    const OEChem::OEMolBase* mol) {
+    constexpr unsigned MAX_RING = 8;
+    std::vector<std::vector<const OEChem::OEAtomBase*>> rings;
+    std::set<std::vector<unsigned>> seen;  // dedup keys (sorted atom idx)
+
+    for (OESystem::OEIter bond = mol->GetBonds(); bond; ++bond) {
+        const OEChem::OEBondBase& b = *bond;
+        if (!b.IsAromatic()) continue;
+        const OEChem::OEAtomBase* start = b.GetBgn();
+        const OEChem::OEAtomBase* goal = b.GetEnd();
+        if (start == nullptr || goal == nullptr) continue;
+
+        // BFS for the shortest path start->goal that does NOT use bond b directly,
+        // through aromatic bonds only. parent[] reconstructs the path.
+        std::queue<const OEChem::OEAtomBase*> q;
+        std::map<unsigned, const OEChem::OEAtomBase*> parent;  // atomIdx -> predecessor
+        std::map<unsigned, unsigned> depth;
+        q.push(start);
+        depth[start->GetIdx()] = 0;
+        parent[start->GetIdx()] = nullptr;
+        const OEChem::OEAtomBase* found = nullptr;
+        while (!q.empty() && found == nullptr) {
+            const OEChem::OEAtomBase* cur = q.front();
+            q.pop();
+            const unsigned cd = depth[cur->GetIdx()];
+            if (cd >= MAX_RING) continue;
+            for (OESystem::OEIter nb = cur->GetBonds(); nb; ++nb) {
+                const OEChem::OEBondBase& e = *nb;
+                if (!e.IsAromatic()) continue;
+                if (&e == &b) continue;  // don't traverse the closing bond itself
+                const OEChem::OEAtomBase* nxt =
+                    (e.GetBgn() == cur) ? e.GetEnd() : e.GetBgn();
+                if (nxt == nullptr) continue;
+                if (depth.count(nxt->GetIdx())) continue;  // visited
+                depth[nxt->GetIdx()] = cd + 1;
+                parent[nxt->GetIdx()] = cur;
+                if (nxt == goal) { found = nxt; break; }
+                q.push(nxt);
+            }
+        }
+        if (found == nullptr) continue;  // no ring through this bond within bound
+
+        // Reconstruct goal->start path, then the ring is path + closing bond.
+        std::vector<const OEChem::OEAtomBase*> cycle;
+        for (const OEChem::OEAtomBase* a = goal; a != nullptr;
+             a = parent[a->GetIdx()]) {
+            cycle.push_back(a);
+        }
+        // cycle currently goal..start; that IS the ring (start and goal are the
+        // closing bond's two atoms, adjacent via b).
+        std::vector<unsigned> key;
+        key.reserve(cycle.size());
+        for (const OEChem::OEAtomBase* a : cycle) key.push_back(a->GetIdx());
+        std::sort(key.begin(), key.end());
+        if (seen.insert(key).second) {
+            rings.push_back(std::move(cycle));
+        }
+    }
+    return rings;
 }
 
 }  // namespace
