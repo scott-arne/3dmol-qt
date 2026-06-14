@@ -49,11 +49,6 @@ constexpr float DOUBLE_BOND_SCALE = 0.4f;    // double sub-cylinder radius / R
 constexpr float TRIPLE_BOND_SCALE = 0.25f;   // triple sub-cylinder radius / R
 constexpr float DOUBLE_OFFSET = 0.6f;        // double line offset / R   (3dmol: r*1.5)
 constexpr float TRIPLE_OFFSET = 0.75f;       // triple outer offset / R  (3dmol: r*3)
-// Aromatic = a double-like straddling pair: a solid outer line + a thinner DASHED
-// inner line toward the ring interior (3dmol's default "dashed" aromaticStyle).
-constexpr float AROMATIC_DASH_RADIUS_FRAC = 0.5f;  // dashed line radius / solid line radius
-constexpr float DASH_LENGTH = 0.10f;  // 3dmol dashedBondConfig.dashLength
-constexpr float DASH_GAP = 0.25f;     // 3dmol dashedBondConfig.gapLength
 // Aromatic delocalized circle (Delocalized style): a thin dashed ring inside
 // each aromatic ring. Tuned visually on benzene.
 constexpr float RING_CIRCLE_FRACTION = 0.6f;   // circle radius / ring apothem (sits inside bonds)
@@ -81,68 +76,6 @@ void accumulate_divergent_neighbor(const OEChem::OEMolBase* mol,
             out = np;
         }
     }
-}
-
-// Emit a dashed line from `a` to `b` as a series of short cylinder segments,
-// ported from 3dmol's calculateDashes (dash 0.1 A, gap 0.25 A + 2*radius,
-// end-padded and centered). Each segment is colored by the near atom, split at
-// `color_mid` (the line's own midpoint). Used for the aromatic inner line.
-void add_dashed_line(BondData& data, const QVector3D& a, const QVector3D& b, float radius,
-                     const Color& color_a, const Color& color_b, const QVector3D& color_mid,
-                     unsigned bond_index) {
-    const QVector3D axis = b - a;
-    const float len = axis.length();
-    if (len < 1.0e-3f) {
-        return;
-    }
-    const QVector3D dir = axis / len;
-    auto seg_color = [&](const QVector3D& s, const QVector3D& e) {
-        const QVector3D m = (s + e) * 0.5f;
-        return QVector3D::dotProduct(m - color_mid, dir) < 0.0f ? color_a : color_b;
-    };
-    const float eff_gap = DASH_GAP + 2.0f * radius;
-    const float end_pad = eff_gap * 0.5f;
-    const float drawable = len - 2.0f * end_pad;
-    if (drawable < DASH_LENGTH) {  // too short for dashes: one solid segment
-        data.add(a, b, radius, seg_color(a, b), bond_index);
-        return;
-    }
-    const int num = static_cast<int>((drawable - DASH_LENGTH) / (DASH_LENGTH + eff_gap)) + 1;
-    const int gaps = num > 1 ? num - 1 : 0;
-    const float remaining = drawable - num * DASH_LENGTH;
-    const float internal_gap = gaps > 0 ? remaining / (gaps + 1) : remaining;
-    const float start = end_pad + internal_gap * 0.5f;
-    for (int i = 0; i < num; ++i) {
-        const float s = start + i * (DASH_LENGTH + internal_gap);
-        const QVector3D ps = a + dir * s;
-        const QVector3D pe = a + dir * (s + DASH_LENGTH);
-        data.add(ps, pe, radius, seg_color(ps, pe), bond_index);
-    }
-}
-
-// Choose which side of the bond (+off or -off) the aromatic dashed inner line
-// goes: toward the average direction of the bond atoms' OTHER neighbors, which
-// points into the ring interior. Port of 3dmol's chooseDashedPlusV. Returns +1
-// for the +off side, -1 for the -off side.
-float aromatic_dash_sign(const OEChem::OEMolBase* mol, const OEChem::OEAtomBase* abgn,
-                         const OEChem::OEAtomBase* aend, const QVector3D& mid,
-                         const QVector3D& off) {
-    QVector3D center(0, 0, 0);
-    int count = 0;
-    for (const OEChem::OEAtomBase* a : {abgn, aend}) {
-        const OEChem::OEAtomBase* other = (a == abgn) ? aend : abgn;
-        for (OESystem::OEIter nbr = a->GetAtoms(); nbr; ++nbr) {
-            const OEChem::OEAtomBase* n = nbr;
-            if (n == other) continue;
-            center += atom_pos(mol, n);
-            ++count;
-        }
-    }
-    if (count == 0) {
-        return -1.0f;  // no neighbors: arbitrary (interior is undefined)
-    }
-    center /= static_cast<float>(count);
-    return QVector3D::dotProduct(off, center - mid) > 0.0f ? 1.0f : -1.0f;
 }
 
 // Smallest aromatic rings as ordered atom cycles. Ported from 3dmol's
@@ -357,17 +290,10 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
         const QVector3D mid = (p_bgn + p_end) * 0.5f;
 
         if (aromatic) {
-            // Symmetric straddling pair (like a double bond): a SOLID outer line
-            // and a thinner DASHED inner line toward the ring interior -- 3dmol's
-            // default aromatic look.
-            const float sub_radius = radius * DOUBLE_BOND_SCALE;
-            const QVector3D d = off * (DOUBLE_OFFSET * radius);
-            const float dash_sign = aromatic_dash_sign(src, abgn, aend, mid, off);
-            const QVector3D solid_d = d * -dash_sign;  // solid on the outer side
-            const QVector3D dash_d = d * dash_sign;    // dashed toward ring interior
-            add_line(data, p_bgn + solid_d, p_end + solid_d, sub_radius, c_bgn, c_end, idx);
-            add_dashed_line(data, p_bgn + dash_d, p_end + dash_d,
-                            sub_radius * AROMATIC_DASH_RADIUS_FRAC, c_bgn, c_end, mid + dash_d, idx);
+            // Delocalized: aromatic ring bonds are normal full-radius cylinders;
+            // the delocalization cue is a dashed circle drawn inside each ring
+            // after this loop (see add_aromatic_circle below).
+            add_line(data, p_bgn, p_end, radius, c_bgn, c_end, idx);
             continue;
         }
 
@@ -383,6 +309,26 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
             add_line(data, p_bgn, p_end, sub_radius, c_bgn, c_end, idx);
             add_line(data, p_bgn + d, p_end + d, sub_radius, c_bgn, c_end, idx);
             add_line(data, p_bgn - d, p_end - d, sub_radius, c_bgn, c_end, idx);
+        }
+    }
+
+    // Delocalized aromatic style: draw a dashed circle inside each aromatic ring.
+    // (Kekule mode rendered alternating orders above and its kekulized copy has no
+    // aromatic bonds, so this naturally does nothing there; guard on the style for
+    // clarity. Read the ORIGINAL mol -- it retains aromatic flags -- not src.)
+    if (style.aromatic_style() == AromaticStyle::Delocalized && !style.single_bonds()) {
+        const Color ring_color = element_color(style.color(), "C");  // neutral grey
+        const auto rings = aromatic_rings(mol);
+        for (const auto& ring : rings) {
+            std::vector<QVector3D> pos;
+            pos.reserve(ring.size());
+            unsigned ring_idx = 0;
+            bool first = true;
+            for (const OEChem::OEAtomBase* a : ring) {
+                pos.push_back(atom_pos(mol, a));
+                if (first) { ring_idx = a->GetIdx(); first = false; }
+            }
+            add_aromatic_circle(data, pos, radius, ring_color, ring_idx);
         }
     }
 
