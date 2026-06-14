@@ -220,6 +220,9 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
     }
 
     BondData data;
+    // Up to 6 half-bonds per bond (triple). Delocalized aromatic circles append
+    // extra chord segments beyond this; the vector simply grows (correctness
+    // unaffected, at most a reallocation for heavily aromatic molecules).
     data.reserve(static_cast<std::size_t>(mol->NumBonds()) * 6);
     const float radius = static_cast<float>(style.radius());
 
@@ -320,15 +323,15 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
         const Color ring_color = element_color(style.color(), "C");  // neutral grey
         const auto rings = aromatic_rings(mol);
         for (const auto& ring : rings) {
+            if (ring.empty()) continue;
             std::vector<QVector3D> pos;
             pos.reserve(ring.size());
-            unsigned ring_idx = 0;
-            bool first = true;
             for (const OEChem::OEAtomBase* a : ring) {
                 pos.push_back(atom_pos(mol, a));
-                if (first) { ring_idx = a->GetIdx(); first = false; }
             }
-            add_aromatic_circle(data, pos, radius, ring_color, ring_idx);
+            // Sentinel source index: the ring's first atom (circles are decorative,
+            // not pickable bonds).
+            add_aromatic_circle(data, pos, radius, ring_color, ring.front()->GetIdx());
         }
     }
 
