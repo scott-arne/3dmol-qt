@@ -10,6 +10,14 @@ namespace oe3dmol {
 /// \brief Default bond cylinder radius in Angstrom (matches 3dmol's stick default).
 constexpr double STICK_DEFAULT_RADIUS = 0.25;
 
+/// \brief How aromatic bonds are drawn.
+///
+/// Kekule: render the molecule's alternating single/double bond orders (no
+/// special aromatic geometry) -- a clean classical look. Delocalized: render a
+/// symmetric solid + dashed inner-line pair per aromatic bond (3dmol's "dashed"
+/// aromatic style).
+enum class AromaticStyle { Kekule, Delocalized };
+
 /// \brief Style parameters for the stick (bond) representation.
 ///
 /// Fluent setters return *this for 3dmol-style chaining.
@@ -24,17 +32,21 @@ public:
     /// \brief Draw every bond as a single cylinder, ignoring order/aromaticity.
     /// \returns *this. Default false (multiplicity and aromaticity are shown).
     StickStyle& single_bonds(bool s) { single_bonds_ = s; return *this; }
+    /// \brief Set how aromatic bonds are drawn. \returns *this. Default Kekule.
+    StickStyle& aromatic_style(AromaticStyle a) { aromatic_style_ = a; return *this; }
 
     double radius() const { return radius_; }
     ColorScheme color() const { return color_; }
     double opacity() const { return opacity_; }
     bool single_bonds() const { return single_bonds_; }
+    AromaticStyle aromatic_style() const { return aromatic_style_; }
 
 private:
     double radius_ = STICK_DEFAULT_RADIUS;
     ColorScheme color_ = ColorScheme::Jmol;
     double opacity_ = 1.0;
     bool single_bonds_ = false;  // false => render bond order + aromaticity
+    AromaticStyle aromatic_style_ = AromaticStyle::Kekule;
 };
 
 }  // namespace oe3dmol

@@ -825,11 +825,11 @@ TEST(BondOrderRenderTest, DoubleBondShowsTwoSeparatedCylinders) {
 }
 
 TEST(BondOrderRenderTest, AromaticBondShowsTwoSeparatedLines) {
-    // An aromatic bond renders like a double bond: a symmetric pair of thin lines
-    // straddling the axis (solid outer + dashed inner), so a scan perpendicular to
-    // the bond crosses TWO filled bands with a background gap between them -- not
-    // one fat single cylinder. Build a single horizontal aromatic bond (face-on)
-    // with a neighbor so the offset plane is in-screen; offset is vertical.
+    // DELOCALIZED aromatic style renders like a double bond: a symmetric pair of
+    // thin lines straddling the axis (solid outer + dashed inner), so a scan
+    // perpendicular to the bond crosses TWO filled bands with a gap between them.
+    // Build a single horizontal aromatic bond (face-on) with a neighbor so the
+    // offset plane is in-screen; offset is vertical. (Default is Kekule.)
     const QSize sz(256, 256);
     RhiContext ctx(sz);
     OEChem::OEGraphMol mol;
@@ -844,7 +844,8 @@ TEST(BondOrderRenderTest, AromaticBondShowsTwoSeparatedLines) {
     mol.NewBond(c1, c3, 1);
     const OEChem::OEMolBase& base = mol;
 
-    BondData bonds = build_bond_data(&base, StickStyle{}.radius(0.10));
+    BondData bonds = build_bond_data(
+        &base, StickStyle{}.radius(0.10).aromatic_style(AromaticStyle::Delocalized));
     AtomData none;
     SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
     renderer.set_geometry(none, bonds);

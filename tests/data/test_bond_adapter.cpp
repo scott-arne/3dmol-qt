@@ -281,6 +281,7 @@ TEST(BondAdapterTest, AromaticBondIsSymmetricSolidPlusDashedPair) {
     mol.NewBond(c1, c3, 1);
 
     StickStyle style;  // radius 0.25
+    style.aromatic_style(AromaticStyle::Delocalized);  // default is now Kekule
     const float r = 0.25f;
     const float sub = r * 0.4f;       // solid line radius = R * doubleBondScale
     const float dash_r = sub * 0.5f;  // dashed line radius = sub * AROMATIC_DASH_RADIUS_FRAC
@@ -315,6 +316,46 @@ TEST(BondAdapterTest, AromaticBondIsSymmetricSolidPlusDashedPair) {
     // Both lines are thinner than a full single bond (they fit within its width).
     EXPECT_LT(sub, r);
     EXPECT_LT(dash_r, sub);
+}
+
+TEST(BondAdapterTest, KekuleAromaticRingRendersAlternatingSingleDouble) {
+    // Default (Kekule) aromatic style: a benzene ring whose bonds already carry
+    // alternating orders 2/1/2/1/2/1 (as OEReadMolecule produces) AND aromatic
+    // flags must render as 3 single + 3 double bonds -- NO dashed segments, all
+    // lines at full radius or the double sub-radius. Verifies we read GetOrder()
+    // (after clear+kekulize on the internal copy), not the dashed delocalized path.
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* c[6];
+    const double R = 1.4;
+    for (int i = 0; i < 6; ++i) {
+        c[i] = mol.NewAtom(6);
+        const double a = (M_PI / 3.0) * i;
+        double p[3] = {R * std::cos(a), R * std::sin(a), 0.0};
+        mol.SetCoords(c[i], p);
+    }
+    for (int i = 0; i < 6; ++i) {
+        OEChem::OEBondBase* b = mol.NewBond(c[i], c[(i + 1) % 6], (i % 2 == 0) ? 2 : 1);
+        b->SetAromatic(true);
+        c[i]->SetAromatic(true);
+    }
+
+    StickStyle style;  // default aromatic_style == Kekule
+    const float r = 0.25f;
+    const float dbl = r * 0.4f;  // double sub-cylinder radius
+    BondData b = build_bond_data(as_base(mol), style);
+
+    // Each bond renders by order: single -> 2 half-bonds at full radius r; double
+    // -> 4 half-bonds at radius dbl. 3 singles + 3 doubles = 6 + 12 = 18 halves.
+    EXPECT_EQ(b.size(), 18u);
+    int full_r = 0, double_r = 0, other = 0;
+    for (std::size_t i = 0; i < b.size(); ++i) {
+        if (std::abs(b.radii[i] - r) < 1e-4f) ++full_r;
+        else if (std::abs(b.radii[i] - dbl) < 1e-4f) ++double_r;
+        else ++other;
+    }
+    EXPECT_EQ(full_r, 6) << "3 single bonds -> 6 full-radius half-bonds";
+    EXPECT_EQ(double_r, 12) << "3 double bonds -> 12 sub-radius half-bonds";
+    EXPECT_EQ(other, 0) << "no dashed/other-radius segments in Kekule mode";
 }
 
 }  // namespace test

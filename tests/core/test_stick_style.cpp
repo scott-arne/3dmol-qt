@@ -31,5 +31,13 @@ TEST(StickStyleTest, SingleBondsDefaultsFalseAndIsChainable) {
     EXPECT_EQ(&ref, &s);
 }
 
+TEST(StickStyleTest, AromaticStyleDefaultsKekuleAndIsChainable) {
+    StickStyle s;
+    EXPECT_EQ(s.aromatic_style(), AromaticStyle::Kekule);  // default
+    StickStyle& ref = s.aromatic_style(AromaticStyle::Delocalized);
+    EXPECT_EQ(s.aromatic_style(), AromaticStyle::Delocalized);
+    EXPECT_EQ(&ref, &s);
+}
+
 }  // namespace test
 }  // namespace oe3dmol

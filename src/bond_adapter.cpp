@@ -162,7 +162,31 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
     data.reserve(static_cast<std::size_t>(mol->NumBonds()) * 6);
     const float radius = static_cast<float>(style.radius());
 
-    for (OESystem::OEIter bond = mol->GetBonds(); bond; ++bond) {
+    // In Kekule aromatic mode, render the molecule's alternating single/double
+    // bond orders instead of a delocalized marker. Realistic inputs (SDF, SMILES,
+    // the design molecules here) already carry valid Kekule orders after
+    // OEReadMolecule, but to be robust we (re)derive them on a MUTABLE COPY via
+    // OEClearAromaticFlags + OEKekulize -- never touching the caller's molecule.
+    // OEKekulize may report failure on already-valid / degenerate inputs; in that
+    // case the orders it leaves in place are still the on-read Kekule orders, so
+    // we use the copy regardless and read GetOrder() from it (the cleared
+    // aromatic flags then route every bond through the order-based paths below).
+    OEChem::OEGraphMol kekulized;
+    const OEChem::OEMolBase* src = mol;
+    if (style.aromatic_style() == AromaticStyle::Kekule && !style.single_bonds()) {
+        bool any_aromatic = false;
+        for (OESystem::OEIter bond = mol->GetBonds(); bond; ++bond) {
+            if ((*bond).IsAromatic()) { any_aromatic = true; break; }
+        }
+        if (any_aromatic) {
+            kekulized = *mol;  // OEGraphMol(const OEMolBase&) deep copy
+            OEChem::OEClearAromaticFlags(kekulized);
+            OEChem::OEKekulize(kekulized);  // best-effort; orders valid either way
+            src = &static_cast<const OEChem::OEMolBase&>(kekulized);
+        }
+    }
+
+    for (OESystem::OEIter bond = src->GetBonds(); bond; ++bond) {
         const OEChem::OEBondBase& b = *bond;
         const OEChem::OEAtomBase* abgn = b.GetBgn();
         const OEChem::OEAtomBase* aend = b.GetEnd();
@@ -170,8 +194,8 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
             continue;
         }
 
-        const QVector3D p_bgn = atom_pos(mol, abgn);
-        const QVector3D p_end = atom_pos(mol, aend);
+        const QVector3D p_bgn = atom_pos(src, abgn);
+        const QVector3D p_end = atom_pos(src, aend);
         // Skip degenerate bonds: a near-zero axis would yield a degenerate
         // orientation basis in the cylinder shader. 1e-3 A matches the project's
         // existing degenerate-geometry clamp (see Camera::zoom_to).
@@ -199,8 +223,8 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
         const QVector3D axis = p_end - p_bgn;
         float best = -1.0f;
         QVector3D ref = p_bgn + QVector3D(0, 1, 0);  // fallback; bond_offset_dir handles it
-        accumulate_divergent_neighbor(mol, abgn, aend, axis, best, ref);
-        accumulate_divergent_neighbor(mol, aend, abgn, axis, best, ref);
+        accumulate_divergent_neighbor(src, abgn, aend, axis, best, ref);
+        accumulate_divergent_neighbor(src, aend, abgn, axis, best, ref);
         const QVector3D off = bond_offset_dir(axis, ref - p_bgn);
         const QVector3D mid = (p_bgn + p_end) * 0.5f;
 
@@ -210,7 +234,7 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
             // default aromatic look.
             const float sub_radius = radius * DOUBLE_BOND_SCALE;
             const QVector3D d = off * (DOUBLE_OFFSET * radius);
-            const float dash_sign = aromatic_dash_sign(mol, abgn, aend, mid, off);
+            const float dash_sign = aromatic_dash_sign(src, abgn, aend, mid, off);
             const QVector3D solid_d = d * -dash_sign;  // solid on the outer side
             const QVector3D dash_d = d * dash_sign;    // dashed toward ring interior
             add_line(data, p_bgn + solid_d, p_end + solid_d, sub_radius, c_bgn, c_end, idx);
