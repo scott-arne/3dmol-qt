@@ -27,6 +27,11 @@ void SceneRenderer::set_geometry(const AtomData& atoms, const BondData& bonds) {
 
 void SceneRenderer::draw(QRhiCommandBuffer* cb, const Camera& camera, const QSize& viewport) {
     ImposterUniforms u;
+    // Geometry is uploaded in world space and there is no per-object model
+    // transform, so model_view == view. If per-model transforms are ever added,
+    // they must be folded in here (model_view = view * model); the shaders read
+    // model_view, not view. u.view is filled only to keep the std140 UBO slot
+    // populated (the shaders don't read it).
     u.view = camera.view_matrix();
     u.projection = camera.projection_matrix(
         viewport.height() > 0
