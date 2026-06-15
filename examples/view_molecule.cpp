@@ -11,6 +11,7 @@
 #include <QComboBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMessageBox>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -47,6 +48,17 @@ int representation_index(const std::string& name) {
     return kSphere;
 }
 
+// Report a startup error. In interactive mode (no --grab) show a modal dialog so
+// a GUI launch with no terminal still tells the user what went wrong; always
+// echo to stderr for command-line / --grab use. Returns 1 for use as exit code.
+int report_startup_error(const QString& message, bool interactive) {
+    std::cerr << message.toStdString() << "\n";
+    if (interactive) {
+        QMessageBox::critical(nullptr, QStringLiteral("oe3dmol viewer"), message);
+    }
+    return 1;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -77,16 +89,21 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    const bool interactive = grab_path.empty();
+
     OEChem::oemolistream ims;
     if (!ims.open(input.c_str())) {
-        std::cerr << "cannot open " << input << "\n";
-        return 1;
+        return report_startup_error(
+            QStringLiteral("Cannot open file: %1").arg(QString::fromStdString(input)),
+            interactive);
     }
     // The widget holds a non-owning pointer, so the molecule must outlive it.
     static OEChem::OEGraphMol mol;
     if (!OEChem::OEReadMolecule(ims, mol)) {
-        std::cerr << "cannot read a molecule from " << input << "\n";
-        return 1;
+        return report_startup_error(
+            QStringLiteral("No molecule could be read from: %1")
+                .arg(QString::fromStdString(input)),
+            interactive);
     }
 
     const OEChem::OEMolBase& base = mol;
