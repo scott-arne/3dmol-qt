@@ -48,7 +48,9 @@ void SceneRenderer::draw(QRhiCommandBuffer* cb, const Camera& camera, const QSiz
     if (has_spheres_) {
         spheres_->set_uniforms(u, batch);
     }
-    cylinders_->set_uniforms(u, batch);
+    if (has_sticks_) {
+        cylinders_->set_uniforms(u, batch);
+    }
     cb->resourceUpdate(batch);
 
     if (has_spheres_) {
