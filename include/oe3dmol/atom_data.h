@@ -36,6 +36,13 @@ struct AtomData {
         source_idx.push_back(source_index);
         bounds.include(position, radius);
     }
+
+    /// \brief Append all atoms from `other` (grows the bounding box via add()).
+    void append(const AtomData& other) {
+        for (std::size_t i = 0; i < other.size(); ++i) {
+            add(other.positions[i], other.radii[i], other.colors[i], other.source_idx[i]);
+        }
+    }
 };
 
 }  // namespace oe3dmol

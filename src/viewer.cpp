@@ -49,7 +49,9 @@ QImage Viewer::render() {
     build_scene(models_, atoms, bonds, scene_bounds);
 
     Camera cam;
-    cam.zoom_to(scene_bounds.valid() ? scene_bounds : atoms.bounds);
+    // render() already threw above if models_ is empty, so scene_bounds is always
+    // valid here; the old atoms.bounds fallback was unreachable.
+    cam.zoom_to(scene_bounds);
 
     RhiContext ctx(size_);
     SceneRenderer renderer(ctx.rhi(), ctx.render_pass_descriptor());
