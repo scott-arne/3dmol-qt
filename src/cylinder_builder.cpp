@@ -2,6 +2,8 @@
 
 #include "oe3dmol/cylinder_layouts.h"
 
+#include <cassert>
+
 namespace oe3dmol {
 
 MeshBuffer build_cylinder_billboard() {
@@ -27,6 +29,9 @@ MeshBuffer build_cylinder_billboard() {
 std::vector<float> build_cylinder_instances(const BondData& bonds) {
     std::vector<float> inst;
     inst.reserve(bonds.size() * CylinderInstanceLayout::FLOATS_PER_INSTANCE);
+    assert(bonds.ends.size() == bonds.size() && bonds.radii.size() == bonds.size() &&
+           bonds.colors.size() == bonds.size() &&
+           "BondData SoA arrays must be the same length");
     for (std::size_t i = 0; i < bonds.size(); ++i) {
         const QVector3D& s = bonds.starts[i];
         const QVector3D& e = bonds.ends[i];

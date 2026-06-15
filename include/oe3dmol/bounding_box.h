@@ -24,10 +24,11 @@ public:
     /// \brief Maximum corner. Undefined if !valid().
     QVector3D max() const { return max_; }
 
-    /// \brief Geometric center of the box. Undefined if !valid().
+    /// \brief Geometric center of the box. Asserts (debug) if !valid().
     QVector3D center() const;
 
-    /// \brief Radius of the bounding sphere enclosing the box.
+    /// \brief Radius of the bounding sphere enclosing the box. Asserts (debug)
+    /// if !valid().
     float bounding_radius() const;
 
 private:

@@ -1,6 +1,7 @@
 #include "oe3dmol/bounding_box.h"
 
 #include <algorithm>
+#include <cassert>
 
 namespace oe3dmol {
 
@@ -22,10 +23,12 @@ void BoundingBox::include(const QVector3D& center, float radius) {
 }
 
 QVector3D BoundingBox::center() const {
+    assert(valid_ && "BoundingBox::center() called on an empty box");
     return (min_ + max_) * 0.5f;
 }
 
 float BoundingBox::bounding_radius() const {
+    assert(valid_ && "BoundingBox::bounding_radius() called on an empty box");
     return ((max_ - min_) * 0.5f).length();
 }
 

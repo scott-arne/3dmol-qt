@@ -1,10 +1,14 @@
 #include "oe3dmol/sphere_imposter_builder.h"
 
+#include <cassert>
+
 namespace oe3dmol {
 
 MeshBuffer build_sphere_imposters(const AtomData& atoms) {
     MeshBuffer mesh;
     const std::size_t n = atoms.size();
+    assert(atoms.radii.size() == n && atoms.colors.size() == n &&
+           "AtomData SoA arrays must be the same length");
     constexpr int S = VertexLayout::FLOATS_PER_VERTEX;
 
     mesh.vertices.resize(n * 4 * S);
