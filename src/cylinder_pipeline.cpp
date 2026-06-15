@@ -71,25 +71,24 @@ CylinderPipeline::CylinderPipeline(QRhi* rhi, QRhiRenderPassDescriptor* rp)
     ensure_cylinder_shader_resources();
 
     ubuf_.reset(rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, UBO_SIZE));
-    if (!ubuf_->create()) {
-        throw RenderError("CylinderPipeline: failed to create uniform buffer");
-    }
+    render_require(ubuf_ && ubuf_->create(),
+                   "CylinderPipeline: failed to create uniform buffer");
 
     srb_.reset(rhi_->newShaderResourceBindings());
+    render_require(srb_ != nullptr, "CylinderPipeline: failed to create SRB");
     srb_->setBindings({
         QRhiShaderResourceBinding::uniformBuffer(
             0,
             QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
             ubuf_.get()),
     });
-    if (!srb_->create()) {
-        throw RenderError("CylinderPipeline: failed to create SRB");
-    }
+    render_require(srb_->create(), "CylinderPipeline: failed to create SRB");
 
     QShader vs = load_shader(QStringLiteral(":/shaders/cylinder.vert.qsb"));
     QShader fs = load_shader(QStringLiteral(":/shaders/cylinder.frag.qsb"));
 
     pipeline_.reset(rhi_->newGraphicsPipeline());
+    render_require(pipeline_ != nullptr, "CylinderPipeline: failed to create graphics pipeline");
     pipeline_->setShaderStages({
         {QRhiShaderStage::Vertex, vs},
         {QRhiShaderStage::Fragment, fs},
@@ -136,9 +135,7 @@ CylinderPipeline::CylinderPipeline(QRhi* rhi, QRhiRenderPassDescriptor* rp)
     blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
     pipeline_->setTargetBlends({blend});
 
-    if (!pipeline_->create()) {
-        throw RenderError("CylinderPipeline: failed to create graphics pipeline");
-    }
+    render_require(pipeline_->create(), "CylinderPipeline: failed to create graphics pipeline");
 }
 
 CylinderPipeline::~CylinderPipeline() = default;
