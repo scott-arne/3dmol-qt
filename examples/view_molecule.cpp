@@ -97,23 +97,33 @@ int main(int argc, char** argv) {
             QStringLiteral("Cannot open file: %1").arg(QString::fromStdString(input)),
             interactive);
     }
-    // The widget holds a non-owning pointer, so the molecule must outlive it.
-    static OEChem::OEGraphMol mol;
-    if (!OEChem::OEReadMolecule(ims, mol)) {
+    // The widget holds non-owning pointers, so the molecules must outlive it.
+    // This main-local vector lives for the whole interactive session (until
+    // app.exec() returns), so the widget's pointers stay valid.
+    std::vector<OEChem::OEGraphMol> mols;
+    {
+        OEChem::OEGraphMol m;
+        while (OEChem::OEReadMolecule(ims, m)) {
+            mols.push_back(m);
+            m.Clear();
+        }
+    }
+    if (mols.empty()) {
         return report_startup_error(
             QStringLiteral("No molecule could be read from: %1")
                 .arg(QString::fromStdString(input)),
             interactive);
     }
 
-    const OEChem::OEMolBase& base = mol;
-
     // --grab: headless one-frame capture of the initial representation, then exit
     // before any window/dropdown is built.
     if (!grab_path.empty()) {
         oe3dmol::MoleculeViewerWidget widget;
-        const int model = widget.add_model(&base);
-        widget.set_style(model, styles_for(initial_rep, oe3dmol::AromaticStyle::Kekule));
+        for (const OEChem::OEGraphMol& m : mols) {
+            const OEChem::OEMolBase& base = m;
+            const int model = widget.add_model(&base);
+            widget.set_style(model, styles_for(initial_rep, oe3dmol::AromaticStyle::Kekule));
+        }
         widget.resize(800, 600);
         const QImage frame = widget.grabFramebuffer();
         if (frame.isNull()) {
@@ -158,22 +168,29 @@ int main(int argc, char** argv) {
     // The layout takes ownership of the viewer once added below.
     auto arom = std::make_shared<oe3dmol::AromaticStyle>(oe3dmol::AromaticStyle::Kekule);
     auto* viewer = new oe3dmol::MoleculeViewerWidget;
-    const int model = viewer->add_model(&base);
-    viewer->set_style(model, styles_for(initial_rep, *arom));
+    std::vector<int> model_ids;
+    for (const OEChem::OEGraphMol& m : mols) {
+        const OEChem::OEMolBase& base = m;
+        const int model = viewer->add_model(&base);
+        viewer->set_style(model, styles_for(initial_rep, *arom));
+        model_ids.push_back(model);
+    }
 
     layout->addLayout(toolbar);
     layout->addWidget(viewer, 1);  // viewer fills the remaining space
 
     // Live switching: re-apply the selected representation on change.
     QObject::connect(combo, &QComboBox::currentIndexChanged,
-                     [viewer, model, arom](int index) {
-                         viewer->set_style(model, styles_for(index, *arom));
+                     [viewer, model_ids, arom](int index) {
+                         for (int id : model_ids)
+                             viewer->set_style(id, styles_for(index, *arom));
                      });
     QObject::connect(arom_combo, &QComboBox::currentIndexChanged,
-                     [viewer, model, arom, combo](int aidx) {
+                     [viewer, model_ids, arom, combo](int aidx) {
                          *arom = (aidx == 1) ? oe3dmol::AromaticStyle::Delocalized
                                              : oe3dmol::AromaticStyle::Kekule;
-                         viewer->set_style(model, styles_for(combo->currentIndex(), *arom));
+                         for (int id : model_ids)
+                             viewer->set_style(id, styles_for(combo->currentIndex(), *arom));
                      });
     combo->setCurrentIndex(initial_rep);  // reflect the CLI selection in the control
 

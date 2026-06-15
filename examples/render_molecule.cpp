@@ -29,23 +29,33 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    OEChem::OEGraphMol mol;
-    if (!OEChem::OEReadMolecule(ims, mol)) {
+    // Read every record; the molecules must outlive the viewer (non-owning models).
+    std::vector<OEChem::OEGraphMol> mols;
+    {
+        OEChem::OEGraphMol m;
+        while (OEChem::OEReadMolecule(ims, m)) {
+            mols.push_back(m);
+            m.Clear();
+        }
+    }
+    if (mols.empty()) {
         std::cerr << "cannot read a molecule from " << argv[1] << "\n";
         return 1;
     }
 
     try {
         oe3dmol::Viewer viewer(800, 600);
-        const OEChem::OEMolBase& base = mol;
-        int idx = viewer.add_model(&base);
         const std::string mode = (argc > 3) ? argv[3] : "sphere";
-        if (mode == "ballstick") {
-            viewer.set_style(idx, std::vector<oe3dmol::StyleSpec>{
-                oe3dmol::SphereStyle{}.scale(0.3).color(oe3dmol::ColorScheme::Jmol),
-                oe3dmol::StickStyle{}.color(oe3dmol::ColorScheme::Jmol)});
-        } else {
-            viewer.set_style(idx, oe3dmol::SphereStyle{}.color(oe3dmol::ColorScheme::Jmol));
+        for (const OEChem::OEGraphMol& m : mols) {
+            const OEChem::OEMolBase& base = m;
+            int idx = viewer.add_model(&base);
+            if (mode == "ballstick") {
+                viewer.set_style(idx, std::vector<oe3dmol::StyleSpec>{
+                    oe3dmol::SphereStyle{}.scale(0.3).color(oe3dmol::ColorScheme::Jmol),
+                    oe3dmol::StickStyle{}.color(oe3dmol::ColorScheme::Jmol)});
+            } else {
+                viewer.set_style(idx, oe3dmol::SphereStyle{}.color(oe3dmol::ColorScheme::Jmol));
+            }
         }
         viewer.zoom_to();
         if (!viewer.render_to_png(argv[2])) {
