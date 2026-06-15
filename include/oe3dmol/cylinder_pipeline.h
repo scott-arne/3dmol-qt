@@ -9,7 +9,7 @@
 #include <QSize>
 
 #include "oe3dmol/mesh_buffer.h"
-#include "oe3dmol/sphere_imposter_pipeline.h"  // ImposterUniforms (shared UBO)
+#include "oe3dmol/imposter_uniforms.h"
 
 QT_BEGIN_NAMESPACE
 class QRhi;

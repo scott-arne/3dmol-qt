@@ -1,6 +1,7 @@
 #include "oe3dmol/cylinder_pipeline.h"
 
 #include "oe3dmol/cylinder_layouts.h"
+#include "oe3dmol/imposter_uniforms.h"
 #include "oe3dmol/render_errors.h"
 
 #include <QFile>
@@ -35,42 +36,13 @@ QShader load_shader(const QString& path) {
     return s;
 }
 
-// std140 size: 4 mat4 (256) + 3 vec4 (48) + 4 floats (16) = 320 bytes.
-// Matches the shared ImposterUniforms layout consumed by the cylinder shaders.
-constexpr quint32 UBO_SIZE = 320;
-
-void pack_uniforms(const ImposterUniforms& u, float* out) {
-    int o = 0;
-    auto put_mat = [&](const QMatrix4x4& m) {
-        const float* d = m.constData();  // column-major, matches std140 mat4
-        for (int i = 0; i < 16; ++i) out[o++] = d[i];
-    };
-    put_mat(u.model_view);
-    put_mat(u.projection);
-    put_mat(u.view);
-    put_mat(u.clip_correction);
-    auto put_vec4 = [&](const QVector3D& v) {
-        out[o++] = v.x();
-        out[o++] = v.y();
-        out[o++] = v.z();
-        out[o++] = 0.0f;
-    };
-    put_vec4(u.light_color);
-    put_vec4(u.light_direction);
-    put_vec4(u.fog_color);
-    out[o++] = u.fog_near;
-    out[o++] = u.fog_far;
-    out[o++] = u.opacity;
-    out[o++] = 0.0f;
-}
-
 }  // namespace
 
 CylinderPipeline::CylinderPipeline(QRhi* rhi, QRhiRenderPassDescriptor* rp)
     : rhi_(rhi) {
     ensure_cylinder_shader_resources();
 
-    ubuf_.reset(rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, UBO_SIZE));
+    ubuf_.reset(rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, IMPOSTER_UBO_SIZE));
     render_require(ubuf_ && ubuf_->create(),
                    "CylinderPipeline: failed to create uniform buffer");
 
@@ -178,9 +150,9 @@ void CylinderPipeline::upload(const MeshBuffer& mesh, const std::vector<float>& 
 }
 
 void CylinderPipeline::set_uniforms(const ImposterUniforms& u, QRhiResourceUpdateBatch* batch) {
-    float data[UBO_SIZE / sizeof(float)] = {0};
-    pack_uniforms(u, data);
-    batch->updateDynamicBuffer(ubuf_.get(), 0, UBO_SIZE, data);
+    float data[IMPOSTER_UBO_SIZE / sizeof(float)] = {0};
+    pack_imposter_uniforms(u, data);
+    batch->updateDynamicBuffer(ubuf_.get(), 0, IMPOSTER_UBO_SIZE, data);
 }
 
 void CylinderPipeline::draw(QRhiCommandBuffer* cb, const QSize& viewport) {
