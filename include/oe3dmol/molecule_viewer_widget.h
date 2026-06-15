@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <QColor>
+#include <QMatrix4x4>
 #include <QPoint>
 #include <QRhiWidget>
 
@@ -57,6 +58,13 @@ public:
     /// 'R' key in the interactive viewer, and callable directly. No-op until a
     /// model with valid bounds has been added.
     void zoom_to();
+
+    /// \brief Current camera view matrix (world -> view). Read-only camera-state
+    /// accessor; does not trigger a repaint.
+    QMatrix4x4 view_matrix() const { return camera_.view_matrix(); }
+
+    /// \brief Current camera distance from its target (read-only accessor).
+    float camera_distance() const { return camera_.distance(); }
 
 protected:
     void initialize(QRhiCommandBuffer* cb) override;
