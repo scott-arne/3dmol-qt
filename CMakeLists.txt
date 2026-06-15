@@ -46,11 +46,12 @@ if(Qt6_VERSION VERSION_LESS 6.6)
     message(FATAL_ERROR "Qt 6.6+ is required for a stable QRhi API (found ${Qt6_VERSION}).")
 endif()
 
-# Apply the project's warning level (and optional Werror/sanitizers) to one of
-# our own targets. Applied PRIVATE so flags never propagate to consumers and do
-# not enter the install/export interface. Qt and OpenEye come in as imported
+# Apply the project's warning level (and optional Werror) to one of our own
+# targets. Applied PRIVATE so flags never propagate to consumers and do not
+# enter the install/export interface. Qt and OpenEye come in as imported
 # targets, whose interface includes CMake treats as -isystem by default, so
-# third-party header warnings stay quiet.
+# third-party header warnings stay quiet. (Sanitizers are applied globally
+# below, not here -- they must instrument the linking executables too.)
 function(oe3dmol_set_warnings tgt)
     target_compile_options(${tgt} PRIVATE
         $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall;-Wextra>
@@ -58,14 +59,16 @@ function(oe3dmol_set_warnings tgt)
         $<$<AND:$<BOOL:${OE3DMOL_WERROR}>,$<CXX_COMPILER_ID:GNU,Clang,AppleClang>>:-Werror>
         $<$<AND:$<BOOL:${OE3DMOL_WERROR}>,$<CXX_COMPILER_ID:MSVC>>:/WX>
     )
-    if(OE3DMOL_SANITIZE AND NOT MSVC)
-        # NOTE: applied to our libraries only. For ASan/UBSan to work end to end,
-        # the linking executables (tests, examples) must also be built with these
-        # flags; enable them there too when sanitizing the full suite.
-        target_compile_options(${tgt} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
-        target_link_options(${tgt} PRIVATE -fsanitize=address,undefined)
-    endif()
 endfunction()
+
+# Sanitizers must instrument the whole program -- the libraries AND the
+# executables that link them (tests, examples) -- or the runtime is not pulled
+# in and instrumentation is unreliable. Apply globally (before any target is
+# defined) so every translation unit and link line is covered.
+if(OE3DMOL_SANITIZE AND NOT MSVC)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined)
+endif()
 
 # Targets are added by subsequent tasks.
 
