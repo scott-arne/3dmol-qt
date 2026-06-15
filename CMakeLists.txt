@@ -206,7 +206,8 @@ install(TARGETS oe3dmol_core oe3dmol_geometry oe3dmol_data oe3dmol_render oe3dmo
     ARCHIVE DESTINATION lib
     RUNTIME DESTINATION bin
 )
-install(DIRECTORY include/oe3dmol DESTINATION include)
+install(DIRECTORY include/oe3dmol DESTINATION include
+    PATTERN "detail" EXCLUDE)
 install(EXPORT oe3dmol-targets
     FILE OE3DMOLTargets.cmake
     NAMESPACE OE3DMOL::

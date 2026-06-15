@@ -1,7 +1,8 @@
 #include "oe3dmol/vdw_radii.h"
 
-#include <cctype>
 #include <unordered_map>
+
+#include "oe3dmol/detail/normalized_lookup.h"
 
 namespace oe3dmol {
 
@@ -26,23 +27,7 @@ const std::unordered_map<std::string, double>& vdw_table() {
 }  // namespace
 
 double vdw_radius(const std::string& element) {
-    const auto& table = vdw_table();
-    auto it = table.find(element);
-    if (it != table.end()) {
-        return it->second;
-    }
-    if (element.size() > 1) {
-        std::string normalized = element;
-        normalized[0] = static_cast<char>(std::toupper(normalized[0]));
-        for (std::size_t i = 1; i < normalized.size(); ++i) {
-            normalized[i] = static_cast<char>(std::tolower(normalized[i]));
-        }
-        it = table.find(normalized);
-        if (it != table.end()) {
-            return it->second;
-        }
-    }
-    return DEFAULT_SPHERE_RADIUS;
+    return detail::normalized_lookup(vdw_table(), element).value_or(DEFAULT_SPHERE_RADIUS);
 }
 
 }  // namespace oe3dmol

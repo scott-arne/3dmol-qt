@@ -1,7 +1,8 @@
 #include "oe3dmol/color_schemes.h"
 
-#include <cctype>
 #include <unordered_map>
+
+#include "oe3dmol/detail/normalized_lookup.h"
 
 namespace oe3dmol {
 
@@ -154,22 +155,7 @@ const std::unordered_map<std::string, unsigned int>& rasmol_table() {
 
 unsigned int lookup(const std::unordered_map<std::string, unsigned int>& table,
                     const std::string& element) {
-    auto it = table.find(element);
-    if (it != table.end()) {
-        return it->second;
-    }
-    if (element.size() > 1) {
-        std::string normalized = element;
-        normalized[0] = static_cast<char>(std::toupper(normalized[0]));
-        for (std::size_t i = 1; i < normalized.size(); ++i) {
-            normalized[i] = static_cast<char>(std::tolower(normalized[i]));
-        }
-        it = table.find(normalized);
-        if (it != table.end()) {
-            return it->second;
-        }
-    }
-    return DEFAULT_COLOR;
+    return detail::normalized_lookup(table, element).value_or(DEFAULT_COLOR);
 }
 
 }  // namespace
