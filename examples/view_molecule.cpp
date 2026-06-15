@@ -91,6 +91,13 @@ int main(int argc, char** argv) {
 
     const bool interactive = grab_path.empty();
 
+    if (!OEChem::OEChemIsLicensed()) {
+        return report_startup_error(
+            QStringLiteral("OpenEye OEChem license not found or expired. Set "
+                           "OE_LICENSE to a valid license file."),
+            interactive);
+    }
+
     OEChem::oemolistream ims;
     if (!ims.open(input.c_str())) {
         return report_startup_error(

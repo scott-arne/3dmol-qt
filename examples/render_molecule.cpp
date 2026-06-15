@@ -23,6 +23,12 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    if (!OEChem::OEChemIsLicensed()) {
+        std::cerr << "OpenEye OEChem license not found or expired. Set OE_LICENSE "
+                     "to a valid license file.\n";
+        return 1;
+    }
+
     OEChem::oemolistream ims;
     if (!ims.open(argv[1])) {
         std::cerr << "cannot open " << argv[1] << "\n";
