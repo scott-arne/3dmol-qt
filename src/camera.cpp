@@ -26,7 +26,10 @@ void update_clip(float distance, float radius, float& near_out, float& far_out) 
 }  // namespace
 
 void Camera::zoom_to(const BoundingBox& box, float fov_y_degrees) {
-    fov_y_ = fov_y_degrees;
+    // Clamp to a safe open interval: tan(fov/2) blows up to +/-inf at fov=180
+    // and goes negative beyond it, which would poison every pan/move_z/projection
+    // scale. 170 deg is an extreme-but-finite ceiling; 1 deg a sane floor.
+    fov_y_ = std::clamp(fov_y_degrees, 1.0f, 170.0f);
     target_ = box.valid() ? box.center() : QVector3D(0.0f, 0.0f, 0.0f);
     scene_radius_ = box.valid() ? std::max(box.bounding_radius(), 1e-3f) : 1.0f;
     const float half_fov_rad = (fov_y_ * 0.5f) * static_cast<float>(M_PI) / 180.0f;
