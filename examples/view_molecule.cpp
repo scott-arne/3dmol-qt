@@ -20,6 +20,7 @@
 #include "oe3dmol/molecule_viewer_widget.h"
 #include "oe3dmol/stick_style.h"
 #include "oe3dmol/style_spec.h"
+#include "oe3dmol/viewer.h"
 
 namespace {
 
@@ -122,27 +123,27 @@ int main(int argc, char** argv) {
             interactive);
     }
 
-    // --grab: headless one-frame capture of the initial representation, then exit
-    // before any window/dropdown is built.
+    // --grab: headless one-frame capture via the offscreen Viewer (own RhiContext,
+    // explicit camera framing) -- robust where a never-shown QRhiWidget's
+    // grabFramebuffer() is platform-dependent.
     if (!grab_path.empty()) {
-        oe3dmol::MoleculeViewerWidget widget;
-        for (const OEChem::OEGraphMol& m : mols) {
-            const OEChem::OEMolBase& base = m;
-            const int model = widget.add_model(&base);
-            widget.set_style(model, styles_for(initial_rep, oe3dmol::AromaticStyle::Kekule));
-        }
-        widget.resize(800, 600);
-        const QImage frame = widget.grabFramebuffer();
-        if (frame.isNull()) {
-            std::cerr << "grabFramebuffer returned a null image\n";
+        try {
+            oe3dmol::Viewer viewer(800, 600);
+            for (const OEChem::OEGraphMol& m : mols) {
+                const OEChem::OEMolBase& base = m;
+                const int model = viewer.add_model(&base);
+                viewer.set_style(model, styles_for(initial_rep, oe3dmol::AromaticStyle::Kekule));
+            }
+            viewer.zoom_to();
+            if (!viewer.render_to_png(grab_path)) {
+                std::cerr << "failed to render " << grab_path << "\n";
+                return 1;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "grab failed: " << e.what() << "\n";
             return 1;
         }
-        if (!frame.save(QString::fromStdString(grab_path), "PNG")) {
-            std::cerr << "failed to save " << grab_path << "\n";
-            return 1;
-        }
-        std::cout << "wrote " << grab_path << " (" << frame.width() << "x"
-                  << frame.height() << ")\n";
+        std::cout << "wrote " << grab_path << "\n";
         return 0;
     }
 
