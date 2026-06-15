@@ -44,6 +44,31 @@ private:
 ::testing::Environment* const kEnv =
     ::testing::AddGlobalTestEnvironment(new RenderEnvironment);
 
+// True when a real (non-Null) RHI backend is available. Probed once: inside a
+// sandbox or on a GPU-less host, RhiContext falls back to QRhi::Null, whose
+// readback is a cleared (unrendered) image -- so pixel-color assertions would
+// FAIL rather than skip. Tests that assert rendered pixels guard on this.
+inline bool gpu_available() {
+    static const bool ok = []() {
+        try {
+            RhiContext probe(QSize(8, 8));
+            return probe.backend_name().compare(QStringLiteral("Null"),
+                                                Qt::CaseInsensitive) != 0;
+        } catch (...) {
+            return false;
+        }
+    }();
+    return ok;
+}
+
+// Skip the current test (with a clear reason) when no real GPU backend exists.
+#define SKIP_IF_NO_GPU()                                                       \
+    do {                                                                       \
+        if (!::oe3dmol::test::gpu_available())                                 \
+            GTEST_SKIP() << "No real RHI backend (Null fallback); skipping "   \
+                            "render pixel assertions.";                        \
+    } while (0)
+
 TEST(RhiContextTest, ClearsToBackgroundColor) {
     RhiContext ctx(QSize(64, 64));
     QImage img = ctx.render_frame(QColor(10, 20, 30), [](QRhiCommandBuffer*) {});
@@ -57,6 +82,7 @@ TEST(RhiContextTest, ClearsToBackgroundColor) {
 }
 
 TEST(SphereImposterPipelineTest, DrawsRedSphereAtCenter) {
+    SKIP_IF_NO_GPU();
     const QSize sz(128, 128);
     RhiContext ctx(sz);
 
@@ -93,6 +119,7 @@ TEST(SphereImposterPipelineTest, DrawsRedSphereAtCenter) {
 }
 
 TEST(SphereImposterPipelineTest, OpacityDarkensOverBlackBackground) {
+    SKIP_IF_NO_GPU();
     const QSize sz(128, 128);
     auto render_alpha = [&](float alpha) -> QColor {
         RhiContext ctx(sz);
@@ -129,6 +156,7 @@ TEST(SphereImposterPipelineTest, OpacityDarkensOverBlackBackground) {
 }
 
 TEST(CylinderPipelineTest, DrawsHorizontalBond) {
+    SKIP_IF_NO_GPU();
     const QSize sz(128, 128);
     RhiContext ctx(sz);
 
@@ -164,6 +192,7 @@ TEST(CylinderPipelineTest, DrawsHorizontalBond) {
 }
 
 TEST(CylinderPipelineTest, ZeroInstancesIsSafeNoOp) {
+    SKIP_IF_NO_GPU();
     const QSize sz(64, 64);
     RhiContext ctx(sz);
     MeshBuffer bb = build_cylinder_billboard();
@@ -182,6 +211,7 @@ TEST(CylinderPipelineTest, ZeroInstancesIsSafeNoOp) {
 }
 
 TEST(CylinderPipelineTest, TwoBondsRenderDistinctPerInstanceColors) {
+    SKIP_IF_NO_GPU();
     const QSize sz(192, 192);
     RhiContext ctx(sz);
 
@@ -239,6 +269,7 @@ TEST(CylinderPipelineTest, TwoBondsRenderDistinctPerInstanceColors) {
 }
 
 TEST(ViewerCompositionTest, BallAndStickDrawsBothSphereAndStick) {
+    SKIP_IF_NO_GPU();
     OEChem::OEGraphMol mol;
     OEChem::OEAtomBase* a = mol.NewAtom(6);
     OEChem::OEAtomBase* o = mol.NewAtom(8);
@@ -274,6 +305,7 @@ TEST(ViewerCompositionTest, BallAndStickDrawsBothSphereAndStick) {
 }
 
 TEST(ViewerCompositionTest, StickOnlyDrawsSticksNoSpheresPath) {
+    SKIP_IF_NO_GPU();
     // A stick-only style exercises the has_spheres==false branch of render().
     OEChem::OEGraphMol mol;
     OEChem::OEAtomBase* a = mol.NewAtom(6);
@@ -302,6 +334,7 @@ TEST(ViewerCompositionTest, StickOnlyDrawsSticksNoSpheresPath) {
 }
 
 TEST(ViewerCompositionTest, Sp1SphereStyleOverloadStillRenders) {
+    SKIP_IF_NO_GPU();
     // Regression: the single-SphereStyle overload (delegating to the vector form)
     // must still render after the multi-style refactor.
     OEChem::OEGraphMol mol;
@@ -327,6 +360,7 @@ TEST(ViewerCompositionTest, Sp1SphereStyleOverloadStillRenders) {
 }
 
 TEST(SceneRendererTest, RendersSphereSceneNonEmpty) {
+    SKIP_IF_NO_GPU();
     const QSize sz(128, 128);
     RhiContext ctx(sz);
 
@@ -349,6 +383,7 @@ TEST(SceneRendererTest, RendersSphereSceneNonEmpty) {
 }
 
 TEST(SceneRendererTest, OrbitChangesRenderedImage) {
+    SKIP_IF_NO_GPU();
     const QSize sz(128, 128);
 
     AtomData atoms;
@@ -384,6 +419,7 @@ TEST(SceneRendererTest, OrbitChangesRenderedImage) {
 }
 
 TEST(SceneRendererTest, SphereStaysLitAfter180Orbit) {
+    SKIP_IF_NO_GPU();
     // Imposter normals are reconstructed in view space and always face the
     // camera, so the directional light must be a view-space HEADLIGHT (fixed
     // relative to the camera). If it is instead rotated by the view matrix
@@ -420,6 +456,7 @@ TEST(SceneRendererTest, SphereStaysLitAfter180Orbit) {
 }
 
 TEST(SceneRendererTest, StickStaysLitAfter180Orbit) {
+    SKIP_IF_NO_GPU();
     // Same headlight invariant for the cylinder imposter. A stick through the
     // orbit target still crosses screen-center after any orbit, so the center
     // pixel stays on the cylinder body; its brightness must not collapse at 180.
@@ -451,6 +488,7 @@ TEST(SceneRendererTest, StickStaysLitAfter180Orbit) {
 }
 
 TEST(SceneRendererTest, RendersStickSceneNonEmpty) {
+    SKIP_IF_NO_GPU();
     const QSize sz(128, 128);
     RhiContext ctx(sz);
 
@@ -474,6 +512,7 @@ TEST(SceneRendererTest, RendersStickSceneNonEmpty) {
 }
 
 TEST(SceneRendererTest, SetGeometryReuploadsOnSecondDraw) {
+    SKIP_IF_NO_GPU();
     const QSize sz(128, 128);
     RhiContext ctx(sz);
 
@@ -509,6 +548,7 @@ TEST(SceneRendererTest, SetGeometryReuploadsOnSecondDraw) {
 }
 
 TEST(SceneRendererTest, CylinderCapBuriedInSphereIsOccluded) {
+    SKIP_IF_NO_GPU();
     const QSize sz(256, 256);
     RhiContext ctx(sz);
 
@@ -548,6 +588,7 @@ TEST(SceneRendererTest, CylinderCapBuriedInSphereIsOccluded) {
 }
 
 TEST(SceneRendererTest, EmptySceneRendersClearedFrame) {
+    SKIP_IF_NO_GPU();
     const QSize sz(64, 64);
     RhiContext ctx(sz);
 
@@ -566,6 +607,7 @@ TEST(SceneRendererTest, EmptySceneRendersClearedFrame) {
 }
 
 TEST(CylinderPipelineTest, EndCapIsRounded) {
+    SKIP_IF_NO_GPU();
     // A single short horizontal bond on black; the right end should be a convex
     // (rounded) cap, not a flat vertical edge. Sample columns near the right end:
     // a rounded cap's filled height shrinks smoothly to zero; a flat cap drops
@@ -608,6 +650,7 @@ TEST(CylinderPipelineTest, EndCapIsRounded) {
 }
 
 TEST(SceneRendererTest, BentBondJointHasNoHoleAndNoSeam) {
+    SKIP_IF_NO_GPU();
     const QSize sz(256, 256);
     RhiContext ctx(sz);
     // Bent path A-B-C (~120 deg) as sticks only, via two half-bonds per bond.
@@ -691,6 +734,7 @@ TEST(SceneRendererTest, BentBondJointHasNoHoleAndNoSeam) {
 
 
 TEST(SceneRendererTest, FrontHalfGeometryIsNotClipped) {
+    SKIP_IF_NO_GPU();
     // Regression for the front-clipping bug: gl_Position must be mapped into the
     // backend's clip volume via QRhi::clipSpaceCorrMatrix(). We feed an OpenGL-
     // convention projection (clip z in [-1,1]); Metal/D3D/Vulkan clip at z<0, so
@@ -728,6 +772,7 @@ TEST(SceneRendererTest, FrontHalfGeometryIsNotClipped) {
 
 
 TEST(CylinderPipelineTest, TiltedBondCapStaysRounded) {
+    SKIP_IF_NO_GPU();
     // Regression for flat caps on tilted bonds: the billboard used to extend past
     // each endpoint along the 3D bond axis, which foreshortens as the bond tilts
     // toward the camera, so the quad no longer covered the hemispherical cap's
@@ -784,6 +829,7 @@ TEST(CylinderPipelineTest, TiltedBondCapStaysRounded) {
 
 
 TEST(BondOrderRenderTest, DoubleBondShowsTwoSeparatedCylinders) {
+    SKIP_IF_NO_GPU();
     // A single double bond between two atoms, plus a neighbor so the offset plane
     // is in-screen. Camera looks down -Z; bond along X, offset along Y.
     const QSize sz(256, 256);
@@ -826,6 +872,7 @@ TEST(BondOrderRenderTest, DoubleBondShowsTwoSeparatedCylinders) {
 }
 
 TEST(BondOrderRenderTest, DelocalizedBenzeneShowsInnerCircle) {
+    SKIP_IF_NO_GPU();
     // Delocalized benzene face-on: aromatic ring bonds are full cylinders, and a
     // thin dashed circle appears INSIDE the hexagon. Sample a central interior
     // disk (well inside the bonds) and confirm multiple bond-colored hits there --
@@ -877,6 +924,7 @@ TEST(BondOrderRenderTest, DelocalizedBenzeneShowsInnerCircle) {
 }
 
 TEST(BondOrderRenderTest, DoubleBondNotMuchWiderThanSingle) {
+    SKIP_IF_NO_GPU();
     // A double bond renders as two thinner offset cylinders that together read as
     // ~one-bond-wide (3dmol look). The earlier bug spaced two FULL-radius cylinders
     // ~a half-bond-length apart, making the double bond ~3x the visual width of a
