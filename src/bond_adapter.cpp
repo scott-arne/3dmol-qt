@@ -202,6 +202,59 @@ void add_aromatic_circle(BondData& data, const std::vector<QVector3D>& ring_pos,
     }
 }
 
+// Resolve the molecule to read bond orders from. In Kekule aromatic mode with
+// aromatic bonds present, returns a kekulized deep copy (held in `storage`) whose
+// cleared aromatic flags route every bond through the order-based paths; otherwise
+// returns `mol` unchanged. `storage` must outlive the returned pointer.
+//
+// Realistic inputs (SDF, SMILES) already carry valid Kekule orders after
+// OEReadMolecule, but to be robust we (re)derive them on the MUTABLE COPY via
+// OEClearAromaticFlags + OEKekulize -- never touching the caller's molecule.
+// OEKekulize may report failure on already-valid / degenerate inputs; in that
+// case the orders it leaves in place are still the on-read Kekule orders, so we
+// use the copy regardless and read GetOrder() from it.
+const OEChem::OEMolBase* resolve_kekule_source(const OEChem::OEMolBase* mol,
+                                               const StickStyle& style,
+                                               OEChem::OEGraphMol& storage) {
+    if (style.aromatic_style() != AromaticStyle::Kekule || style.single_bonds()) {
+        return mol;
+    }
+    bool any_aromatic = false;
+    for (OESystem::OEIter bond = mol->GetBonds(); bond; ++bond) {
+        if ((*bond).IsAromatic()) { any_aromatic = true; break; }
+    }
+    if (!any_aromatic) {
+        return mol;
+    }
+    storage = *mol;  // OEGraphMol(const OEMolBase&) deep copy
+    OEChem::OEClearAromaticFlags(storage);
+    OEChem::OEKekulize(storage);  // best-effort; orders valid either way
+    return &static_cast<const OEChem::OEMolBase&>(storage);
+}
+
+// Delocalized aromatic style: draw a dashed circle inside each aromatic ring.
+// Reads the ORIGINAL mol (it retains aromatic flags, unlike a kekulized copy).
+// No-op in Kekule mode or when single_bonds() collapses multiplicity.
+void emit_aromatic_circles(BondData& data, const OEChem::OEMolBase* mol,
+                           const StickStyle& style, float radius) {
+    if (style.aromatic_style() != AromaticStyle::Delocalized || style.single_bonds()) {
+        return;
+    }
+    const Color ring_color = element_color(style.color(), "C");  // neutral grey
+    const auto rings = aromatic_rings(mol);
+    for (const auto& ring : rings) {
+        if (ring.empty()) continue;
+        std::vector<QVector3D> pos;
+        pos.reserve(ring.size());
+        for (const OEChem::OEAtomBase* a : ring) {
+            pos.push_back(atom_pos(mol, a));
+        }
+        // Sentinel source index: the ring's first atom (circles are decorative,
+        // not pickable bonds).
+        add_aromatic_circle(data, pos, radius, ring_color, ring.front()->GetIdx());
+    }
+}
+
 }  // namespace
 
 QVector3D bond_offset_dir(const QVector3D& axis, const QVector3D& ref) {
@@ -232,30 +285,12 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
     data.reserve(static_cast<std::size_t>(mol->NumBonds()) * 6);
     const float radius = static_cast<float>(style.radius());
 
-    // In Kekule aromatic mode, render the molecule's alternating single/double
-    // bond orders instead of a delocalized marker. Realistic inputs (SDF, SMILES,
-    // the design molecules here) already carry valid Kekule orders after
-    // OEReadMolecule, but to be robust we (re)derive them on a MUTABLE COPY via
-    // OEClearAromaticFlags + OEKekulize -- never touching the caller's molecule.
-    // OEKekulize may report failure on already-valid / degenerate inputs; in that
-    // case the orders it leaves in place are still the on-read Kekule orders, so
-    // we use the copy regardless and read GetOrder() from it (the cleared
-    // aromatic flags then route every bond through the order-based paths below).
+    // Phase 1: choose the molecule to read orders from (kekulized copy in Kekule
+    // mode, else the input as-is). `kekulized` storage must outlive `src`.
     OEChem::OEGraphMol kekulized;
-    const OEChem::OEMolBase* src = mol;
-    if (style.aromatic_style() == AromaticStyle::Kekule && !style.single_bonds()) {
-        bool any_aromatic = false;
-        for (OESystem::OEIter bond = mol->GetBonds(); bond; ++bond) {
-            if ((*bond).IsAromatic()) { any_aromatic = true; break; }
-        }
-        if (any_aromatic) {
-            kekulized = *mol;  // OEGraphMol(const OEMolBase&) deep copy
-            OEChem::OEClearAromaticFlags(kekulized);
-            OEChem::OEKekulize(kekulized);  // best-effort; orders valid either way
-            src = &static_cast<const OEChem::OEMolBase&>(kekulized);
-        }
-    }
+    const OEChem::OEMolBase* src = resolve_kekule_source(mol, style, kekulized);
 
+    // Phase 2: emit per-bond cylinders (single / double / triple / aromatic).
     for (OESystem::OEIter bond = src->GetBonds(); bond; ++bond) {
         const OEChem::OEBondBase& b = *bond;
         const OEChem::OEAtomBase* abgn = b.GetBgn();
@@ -300,7 +335,7 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
         if (aromatic) {
             // Delocalized: aromatic ring bonds are normal full-radius cylinders;
             // the delocalization cue is a dashed circle drawn inside each ring
-            // after this loop (see add_aromatic_circle below).
+            // after this loop (see emit_aromatic_circles).
             add_line(data, p_bgn, p_end, radius, c_bgn, c_end, idx);
             continue;
         }
@@ -320,25 +355,8 @@ BondData build_bond_data(const OEChem::OEMolBase* mol, const StickStyle& style) 
         }
     }
 
-    // Delocalized aromatic style: draw a dashed circle inside each aromatic ring.
-    // (Kekule mode rendered alternating orders above and its kekulized copy has no
-    // aromatic bonds, so this naturally does nothing there; guard on the style for
-    // clarity. Read the ORIGINAL mol -- it retains aromatic flags -- not src.)
-    if (style.aromatic_style() == AromaticStyle::Delocalized && !style.single_bonds()) {
-        const Color ring_color = element_color(style.color(), "C");  // neutral grey
-        const auto rings = aromatic_rings(mol);
-        for (const auto& ring : rings) {
-            if (ring.empty()) continue;
-            std::vector<QVector3D> pos;
-            pos.reserve(ring.size());
-            for (const OEChem::OEAtomBase* a : ring) {
-                pos.push_back(atom_pos(mol, a));
-            }
-            // Sentinel source index: the ring's first atom (circles are decorative,
-            // not pickable bonds).
-            add_aromatic_circle(data, pos, radius, ring_color, ring.front()->GetIdx());
-        }
-    }
+    // Phase 3: Delocalized aromatic circles (reads the original mol's aromatic flags).
+    emit_aromatic_circles(data, mol, style, radius);
 
     return data;
 }
