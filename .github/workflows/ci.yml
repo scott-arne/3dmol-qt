@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+# The self-hosted GPU runner is a serial bottleneck; cancel superseded runs on
+# the same ref so rapid pushes don't queue redundant GPU jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    # Bound total job time so a hung GPU test cannot occupy the shared runner.
+    timeout-minutes: 30
+    # Self-hosted runner: must provide Qt6 (6.6+ with shader tools / qsb),
+    # a C++17 toolchain, CMake 3.16+, OpenEye (OE_DIR or OPENEYE_ROOT set,
+    # plus a valid OE_LICENSE), and a real GPU for the render tests.
+    # FetchContent (googletest, cmake-openeye) needs network access; a runner
+    # behind a proxy must supply HTTP_PROXY, HTTPS_PROXY and NO_PROXY through
+    # its environment or the runner's .env file.
+    runs-on: [self-hosted, gpu, openeye]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DOE3DMOL_WERROR=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        # Render tests self-skip on the Null backend; sandbox must be OFF so the
+        # real GPU is used. --output-on-failure surfaces any pixel-diff failures.
+        run: ctest --test-dir build --output-on-failure
