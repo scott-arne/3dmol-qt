@@ -90,11 +90,15 @@ QImage RhiContext::render_frame(
     batch->readBackTexture(rb, &readback);
 
     cb->endPass(batch);
-    rhi_->endOffscreenFrame();
+    const QRhi::FrameOpResult end_result = rhi_->endOffscreenFrame();
 
     if (!readback_done || readback.data.isEmpty()) {
-        throw RenderError("RhiContext: texture readback produced no data on backend " +
-                          backend_name().toStdString());
+        const bool frame_ok = end_result == QRhi::FrameOpSuccess;
+        throw RenderError(
+            std::string("RhiContext: texture readback produced no data on backend ") +
+            backend_name().toStdString() +
+            (frame_ok ? "" : " (endOffscreenFrame reported a non-success result, "
+                             "e.g. device loss)"));
     }
 
     QImage img(reinterpret_cast<const uchar*>(readback.data.constData()),
