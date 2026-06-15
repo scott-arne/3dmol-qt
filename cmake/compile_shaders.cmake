@@ -16,7 +16,11 @@ function(oe3dmol_compile_shaders OUT_VAR)
             OUTPUT "${_out}"
             COMMAND "${QSB_EXECUTABLE}" --glsl "100es,120,150,440" --hlsl 50 --msl 12
                     -o "${_out}" "${CMAKE_CURRENT_SOURCE_DIR}/${_src}"
+            # DEPENDS also on this module: changing the qsb flags in the COMMAND
+            # above re-runs qsb instead of reusing a stale .qsb (requires the
+            # CMAKE_CURRENT_FUNCTION_LIST_FILE variable, CMake 3.17+).
             DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${_src}"
+                    "${CMAKE_CURRENT_FUNCTION_LIST_FILE}"
             COMMENT "qsb ${_name}"
             VERBATIM
         )
