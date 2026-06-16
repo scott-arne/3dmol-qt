@@ -5,10 +5,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <map>
 #include <queue>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <oechem.h>
@@ -105,8 +105,8 @@ std::vector<std::vector<const OEChem::OEAtomBase*>> aromatic_rings(
         // BFS for the shortest path start->goal that does NOT use bond b directly,
         // through aromatic bonds only. parent[] reconstructs the path.
         std::queue<const OEChem::OEAtomBase*> q;
-        std::map<unsigned, const OEChem::OEAtomBase*> parent;  // atomIdx -> predecessor
-        std::map<unsigned, unsigned> depth;
+        std::unordered_map<unsigned, const OEChem::OEAtomBase*> parent;  // atomIdx -> predecessor
+        std::unordered_map<unsigned, unsigned> depth;
         q.push(start);
         depth[start->GetIdx()] = 0;
         parent[start->GetIdx()] = nullptr;
