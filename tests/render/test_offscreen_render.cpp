@@ -323,6 +323,29 @@ TEST(ViewerValidation, RejectsEmptyMolecule) {
     EXPECT_THROW(viewer.add_model(&base), DataError);
 }
 
+TEST(ViewerEmptyRender, ThrowsOnEmptyStyleVector) {
+    Viewer viewer(64, 64);
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* a = mol.NewAtom(6);
+    double c[3] = {0, 0, 0};
+    mol.SetCoords(a, c);
+    const OEChem::OEMolBase& base = mol;
+    int idx = viewer.add_model(&base);
+    viewer.set_style(idx, std::vector<oe3dmol::StyleSpec>{});  // no styles -> no geometry
+    EXPECT_THROW(viewer.render(), RenderError);
+}
+TEST(ViewerEmptyRender, ThrowsOnStickOnlyBondlessMolecule) {
+    Viewer viewer(64, 64);
+    OEChem::OEGraphMol mol;  // single atom, no bonds
+    OEChem::OEAtomBase* a = mol.NewAtom(6);
+    double c[3] = {0, 0, 0};
+    mol.SetCoords(a, c);
+    const OEChem::OEMolBase& base = mol;
+    int idx = viewer.add_model(&base);
+    viewer.set_style(idx, std::vector<oe3dmol::StyleSpec>{StickStyle{}});  // sticks, no bonds
+    EXPECT_THROW(viewer.render(), RenderError);
+}
+
 TEST(ViewerCompositionTest, BallAndStickDrawsBothSphereAndStick) {
     SKIP_IF_NO_GPU();
     OEChem::OEGraphMol mol;

@@ -64,6 +64,15 @@ void MoleculeViewerWidget::rebuild_geometry() {
     BoundingBox scene_bounds;
     build_scene(models_, atoms_, bonds_, scene_bounds);
     last_bounds_ = scene_bounds;
+    // A non-empty model list with no drawable geometry (empty style vector,
+    // stick-only on a bondless molecule, all-degenerate bonds) is recorded but
+    // NOT thrown: the interactive widget renders background-only rather than
+    // crashing mid-interaction. An empty model list (nothing added yet) is fine.
+    if (!models_.empty() && !scene_bounds.valid()) {
+        last_error_ = QStringLiteral("models produced no drawable geometry");
+    } else {
+        last_error_.clear();
+    }
     // Auto-fit only the first time a valid scene appears; explicit zoom_to()
     // (or the 'R' key) re-frames afterward without fighting user navigation.
     if (!camera_initialized_ && scene_bounds.valid()) {
@@ -102,6 +111,10 @@ void MoleculeViewerWidget::render(QRhiCommandBuffer* cb) {
     // callback (undefined behavior). Catch, end the pass, and record the message.
     try {
         renderer_->draw(cb, camera_, px);
+        // A successful render (even of an empty, background-only scene) clears
+        // last_error_ -- including any "no drawable geometry" message that
+        // rebuild_geometry() recorded. last_error_ tracks the most recent
+        // operation, by design.
         last_error_.clear();
     } catch (const std::exception& e) {
         last_error_ = QString::fromUtf8(e.what());

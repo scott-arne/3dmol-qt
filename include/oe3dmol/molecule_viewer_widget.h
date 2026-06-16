@@ -67,9 +67,14 @@ public:
     /// \brief Current camera distance from its target (read-only accessor).
     float camera_distance() const { return camera_.distance(); }
 
-    /// \brief The most recent render-layer error message, or empty if the last
-    /// render succeeded. Render exceptions are caught (they must not escape Qt's
-    /// virtual render callback) and recorded here instead of propagating.
+    /// \brief The most recent widget-status message, or empty if the last
+    /// operation was clean. Two sources write it: render() records a caught
+    /// render-layer exception here (so it cannot escape Qt's virtual render
+    /// callback), and rebuild_geometry() records when the current models produce
+    /// no drawable geometry. It reflects the MOST RECENT operation: a subsequent
+    /// successful render() clears it. So after a model with no drawable geometry,
+    /// the message is set on set_style/add_model and persists only until the next
+    /// successful (background-only) repaint clears it.
     QString last_error() const { return last_error_; }
 
 protected:

@@ -183,5 +183,14 @@ TEST(MoleculeViewerWidgetTest, LastErrorEmptyByDefault) {
     // verified by review; this pins the default-empty contract of last_error().
 }
 
+TEST(MoleculeViewerWidgetTest, EmptyStyleVectorRecordsErrorWithoutThrow) {
+    TestableWidget w;
+    OEChem::OEGraphMol mol = make_diatomic();
+    const OEChem::OEMolBase& base = mol;
+    w.add_model(&base);
+    EXPECT_NO_THROW(w.set_style(0, std::vector<StyleSpec>{}));  // no styles
+    EXPECT_FALSE(w.last_error().isEmpty());
+}
+
 }  // namespace test
 }  // namespace oe3dmol

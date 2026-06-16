@@ -50,9 +50,14 @@ QImage Viewer::render() {
     BoundingBox scene_bounds;
     build_scene(models_, atoms, bonds, scene_bounds);
 
+    // A non-empty model list can still yield no drawable geometry: an empty style
+    // vector, a stick-only style on a bondless molecule, or all-degenerate bonds.
+    // Framing an invalid bounding box would produce NaNs, so reject it explicitly.
+    if (!scene_bounds.valid()) {
+        throw RenderError("Viewer: models produced no drawable geometry");
+    }
+
     Camera cam;
-    // render() already threw above if models_ is empty, so scene_bounds is always
-    // valid here; the old atoms.bounds fallback was unreachable.
     cam.zoom_to(scene_bounds);
 
     RhiContext ctx(size_);
