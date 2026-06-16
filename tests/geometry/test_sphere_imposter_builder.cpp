@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <limits>
+
+#include "oe3dmol/detail/checked_cast.h"
+#include "oe3dmol/geometry_errors.h"
 #include "oe3dmol/sphere_imposter_builder.h"
 
 namespace oe3dmol {
@@ -103,6 +108,15 @@ TEST(SphereImposterBuilderTest, SecondAtomIndicesAreOffset) {
     EXPECT_EQ(m.indices[6], 4u);
     EXPECT_EQ(m.indices[7], 5u);
     EXPECT_EQ(m.indices[8], 6u);
+}
+
+TEST(CheckedCastTest, PassesBelowCeilingThrowsAbove) {
+    using oe3dmol::detail::checked_u32;
+    EXPECT_EQ(checked_u32(std::size_t{0}, "x"), 0u);
+    EXPECT_EQ(checked_u32(std::size_t{12345}, "x"), 12345u);
+    constexpr std::size_t over =
+        static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()) + 1;
+    EXPECT_THROW(checked_u32(over, "x"), oe3dmol::GeometryError);
 }
 
 }  // namespace test

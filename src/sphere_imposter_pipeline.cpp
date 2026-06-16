@@ -1,5 +1,6 @@
 #include "oe3dmol/sphere_imposter_pipeline.h"
 
+#include "oe3dmol/detail/checked_cast.h"
 #include "oe3dmol/imposter_uniforms.h"
 #include "oe3dmol/render_errors.h"
 
@@ -100,9 +101,11 @@ SphereImposterPipeline::SphereImposterPipeline(QRhi* rhi, QRhiRenderPassDescript
 SphereImposterPipeline::~SphereImposterPipeline() = default;
 
 void SphereImposterPipeline::upload(const MeshBuffer& mesh, QRhiResourceUpdateBatch* batch) {
-    const quint32 vbytes = static_cast<quint32>(mesh.vertices.size() * sizeof(float));
-    const quint32 ibytes = static_cast<quint32>(mesh.indices.size() * sizeof(quint32));
-    index_count_ = static_cast<quint32>(mesh.indices.size());
+    const quint32 vbytes = detail::checked_u32(mesh.vertices.size() * sizeof(float),
+                                               "sphere vertex buffer bytes");
+    const quint32 ibytes = detail::checked_u32(mesh.indices.size() * sizeof(quint32),
+                                               "sphere index buffer bytes");
+    index_count_ = detail::checked_u32(mesh.indices.size(), "sphere index count");
 
     if (!vbuf_ || vbuf_->size() < vbytes) {
         vbuf_.reset(rhi_->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, vbytes));

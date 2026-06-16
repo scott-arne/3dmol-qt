@@ -1,5 +1,7 @@
 #include "oe3dmol/sphere_imposter_builder.h"
 
+#include "oe3dmol/detail/checked_cast.h"
+
 #include <cassert>
 
 namespace oe3dmol {
@@ -10,6 +12,10 @@ MeshBuffer build_sphere_imposters(const AtomData& atoms) {
     assert(atoms.radii.size() == n && atoms.colors.size() == n &&
            "AtomData SoA arrays must be the same length");
     constexpr int S = VertexLayout::FLOATS_PER_VERTEX;
+
+    // QRhi index/vertex buffers are 32-bit; reject scenes that would overflow.
+    (void)detail::checked_u32(n * 4, "sphere vertex count");
+    (void)detail::checked_u32(n * 6, "sphere index count");
 
     mesh.vertices.resize(n * 4 * S);
     mesh.indices.resize(n * 6);
@@ -45,6 +51,8 @@ MeshBuffer build_sphere_imposters(const AtomData& atoms) {
             p[VertexLayout::COLOR_OFFSET + 3] = ca;
         }
 
+        // base_v = a*4 < n*4, already validated to fit in uint32 by the
+        // checked_u32(n*4, ...) guard above, so a plain cast is safe here.
         const std::uint32_t v0 = static_cast<std::uint32_t>(base_v);
         std::uint32_t* idx = &mesh.indices[a * 6];
         idx[0] = v0;

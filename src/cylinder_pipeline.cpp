@@ -1,6 +1,7 @@
 #include "oe3dmol/cylinder_pipeline.h"
 
 #include "oe3dmol/cylinder_layouts.h"
+#include "oe3dmol/detail/checked_cast.h"
 #include "oe3dmol/imposter_uniforms.h"
 #include "oe3dmol/render_errors.h"
 
@@ -114,11 +115,14 @@ CylinderPipeline::~CylinderPipeline() = default;
 
 void CylinderPipeline::upload(const MeshBuffer& mesh, const std::vector<float>& instances,
                               QRhiResourceUpdateBatch* batch) {
-    const quint32 vbytes = static_cast<quint32>(mesh.vertices.size() * sizeof(float));
-    const quint32 ibytes = static_cast<quint32>(mesh.indices.size() * sizeof(quint32));
-    index_count_ = static_cast<quint32>(mesh.indices.size());
-    instance_count_ =
-        static_cast<quint32>(instances.size() / CylinderInstanceLayout::FLOATS_PER_INSTANCE);
+    const quint32 vbytes = detail::checked_u32(mesh.vertices.size() * sizeof(float),
+                                               "cylinder vertex buffer bytes");
+    const quint32 ibytes = detail::checked_u32(mesh.indices.size() * sizeof(quint32),
+                                               "cylinder index buffer bytes");
+    index_count_ = detail::checked_u32(mesh.indices.size(), "cylinder index count");
+    instance_count_ = detail::checked_u32(
+        instances.size() / CylinderInstanceLayout::FLOATS_PER_INSTANCE,
+        "cylinder instance count");
 
     if (!vbuf_ || vbuf_->size() < vbytes) {
         vbuf_.reset(rhi_->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, vbytes));
@@ -138,7 +142,8 @@ void CylinderPipeline::upload(const MeshBuffer& mesh, const std::vector<float>& 
     // When called with zero instances, instbuf_ keeps stale data; that is safe
     // because draw() early-returns on instance_count_ == 0 and never binds it.
     if (instance_count_ > 0) {
-        const quint32 instbytes = static_cast<quint32>(instances.size() * sizeof(float));
+        const quint32 instbytes = detail::checked_u32(instances.size() * sizeof(float),
+                                                      "cylinder instance buffer bytes");
         if (!instbuf_ || instbuf_->size() < instbytes) {
             instbuf_.reset(
                 rhi_->newBuffer(QRhiBuffer::Static, QRhiBuffer::VertexBuffer, instbytes));
