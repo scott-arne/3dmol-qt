@@ -5,6 +5,7 @@
 
 #include "oe3dmol/rhi_context.h"
 #include "oe3dmol/render_errors.h"
+#include "oe3dmol/data_errors.h"
 #include "oe3dmol/sphere_imposter_pipeline.h"
 #include "oe3dmol/sphere_imposter_builder.h"
 #include "oe3dmol/camera.h"
@@ -284,6 +285,24 @@ TEST(CylinderPipelineTest, TwoBondsRenderDistinctPerInstanceColors) {
     EXPECT_TRUE(red_top || red_bottom);    // red rendered somewhere
     EXPECT_TRUE(blue_top || blue_bottom);  // blue rendered somewhere
     EXPECT_NE(red_top, blue_top);          // the two halves differ in color
+}
+
+TEST(ViewerValidation, RejectsNullModelWithoutPoisoning) {
+    Viewer viewer(64, 64);
+    EXPECT_THROW(viewer.add_model(nullptr), DataError);
+    // Not poisoned: a subsequent valid add_model succeeds.
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* a = mol.NewAtom(6);
+    double c[3] = {0, 0, 0};
+    mol.SetCoords(a, c);
+    const OEChem::OEMolBase& base = mol;
+    EXPECT_NO_THROW(viewer.add_model(&base));
+}
+TEST(ViewerValidation, RejectsEmptyMolecule) {
+    Viewer viewer(64, 64);
+    OEChem::OEGraphMol empty;
+    const OEChem::OEMolBase& base = empty;
+    EXPECT_THROW(viewer.add_model(&base), DataError);
 }
 
 TEST(ViewerCompositionTest, BallAndStickDrawsBothSphereAndStick) {

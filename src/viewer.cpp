@@ -1,6 +1,7 @@
 #include "oe3dmol/viewer.h"
 
 #include "oe3dmol/camera.h"
+#include "oe3dmol/detail/validate_molecule.h"
 #include "oe3dmol/render_errors.h"
 #include "oe3dmol/rhi_context.h"
 #include "oe3dmol/scene_builder.h"
@@ -19,6 +20,7 @@ Viewer::Viewer(int width, int height) : size_(width, height) {
 Viewer::~Viewer() = default;
 
 int Viewer::add_model(const OEChem::OEMolBase* mol) {
+    detail::require_renderable_molecule(mol, "Viewer::add_model");
     models_.push_back(SceneModel{mol, {SphereStyle{}}});
     return static_cast<int>(models_.size()) - 1;
 }

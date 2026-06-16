@@ -10,6 +10,7 @@
 #include <rhi/qrhi.h>
 
 #include "oe3dmol/arcball.h"
+#include "oe3dmol/detail/validate_molecule.h"
 #include "oe3dmol/render_errors.h"
 #include "oe3dmol/scene_builder.h"
 #include "oe3dmol/scene_renderer.h"
@@ -25,6 +26,7 @@ MoleculeViewerWidget::MoleculeViewerWidget(QWidget* parent) : QRhiWidget(parent)
 MoleculeViewerWidget::~MoleculeViewerWidget() = default;
 
 int MoleculeViewerWidget::add_model(const OEChem::OEMolBase* mol) {
+    detail::require_renderable_molecule(mol, "MoleculeViewerWidget::add_model");
     models_.push_back(SceneModel{mol, {SphereStyle{}}});
     const int index = static_cast<int>(models_.size()) - 1;
     refresh();

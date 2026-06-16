@@ -11,6 +11,7 @@
 
 #include "oe3dmol/molecule_viewer_widget.h"
 #include "oe3dmol/render_errors.h"
+#include "oe3dmol/data_errors.h"
 #include "oe3dmol/stick_style.h"
 #include "oe3dmol/style_spec.h"
 
@@ -157,6 +158,21 @@ TEST(MoleculeViewerWidgetTest, RKeyReframesAfterOrbit) {
     w.pressKey(Qt::Key_R);
     EXPECT_FALSE(matrices_differ(framed, w.view_matrix()))
         << "'R' should restore the framed view";
+}
+
+TEST(MoleculeViewerWidgetTest, AddModelRejectsNullWithoutPoisoning) {
+    TestableWidget w;
+    EXPECT_THROW(w.add_model(nullptr), DataError);
+    // Not poisoned: a valid model still works afterward.
+    OEChem::OEGraphMol mol = make_diatomic();
+    const OEChem::OEMolBase& base = mol;
+    EXPECT_NO_THROW(w.add_model(&base));
+}
+TEST(MoleculeViewerWidgetTest, AddModelRejectsEmptyMolecule) {
+    TestableWidget w;
+    OEChem::OEGraphMol empty;
+    const OEChem::OEMolBase& base = empty;
+    EXPECT_THROW(w.add_model(&base), DataError);
 }
 
 }  // namespace test
