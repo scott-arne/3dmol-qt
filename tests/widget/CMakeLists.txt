@@ -2,8 +2,7 @@ add_executable(oe3dmol_widget_tests
     test_molecule_viewer_widget.cpp
 )
 target_link_libraries(oe3dmol_widget_tests
-    PRIVATE oe3dmol_widget oe3dmol_data GTest::gtest_main
-            Qt6::Widgets Qt6::Gui OpenEye::OEChem)
+    PRIVATE oe3dmol_widget GTest::gtest_main)
 oe3dmol_set_warnings(oe3dmol_widget_tests)
 # Widget interaction runs entirely in the event handlers (no RHI init), so the
 # offscreen platform suffices -- no GPU device required.

@@ -19,18 +19,41 @@
         "OE3DMOL_BUILD_GPU_TESTS": "ON",
         "OE3DMOL_BUILD_EXAMPLES": "ON"
       }
+    },
+    {
+      "name": "portable",
+      "displayName": "Portable (env CMAKE_PREFIX_PATH / OE_DIR)",
+      "description": "Reads Qt6 + OpenEye locations from the environment; for CI or other developers. Set CMAKE_PREFIX_PATH and OE_DIR before configuring. User-specific overrides belong in CMakeUserPresets.json (gitignored).",
+      "binaryDir": "${sourceDir}/build-portable",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "OE3DMOL_BUILD_TESTS": "ON",
+        "OE3DMOL_BUILD_GPU_TESTS": "ON",
+        "OE3DMOL_BUILD_EXAMPLES": "ON"
+      }
     }
   ],
   "buildPresets": [
     {
       "name": "default",
       "configurePreset": "default"
+    },
+    {
+      "name": "portable",
+      "configurePreset": "portable"
     }
   ],
   "testPresets": [
     {
       "name": "default",
       "configurePreset": "default",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "portable",
+      "configurePreset": "portable",
       "output": {
         "outputOnFailure": true
       }
