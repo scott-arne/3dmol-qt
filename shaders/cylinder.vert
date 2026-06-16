@@ -65,14 +65,32 @@ void main() {
     // and the cross product vanishes; fall back to an arbitrary screen axis so
     // the billboard still covers the end-on circular silhouette.
     bool degenerate = dot(latCross, latCross) < 1e-12;
+    // Fallback for an end-on bond (axis parallel to the view ray): cross rdir
+    // with whichever basis axis is LEAST parallel to it (smallest |dot|), giving
+    // a single guaranteed-nonzero vector to normalize. The previous "sum of two
+    // crosses" could cancel to zero (e.g. rdir ~ (a,a,0)) and normalize a zero.
+    vec3 fallbackAxis;
+    {
+        float fx = abs(rdir.x);
+        float fy = abs(rdir.y);
+        float fz = abs(rdir.z);
+        if (fx <= fy && fx <= fz) {
+            fallbackAxis = vec3(1.0, 0.0, 0.0);
+        } else if (fy <= fz) {
+            fallbackAxis = vec3(0.0, 1.0, 0.0);
+        } else {
+            fallbackAxis = vec3(0.0, 0.0, 1.0);
+        }
+    }
     vec3 lateral = degenerate
-        ? normalize(cross(rdir, vec3(0.0, 1.0, 0.0)) + cross(rdir, vec3(1.0, 0.0, 0.0)))
+        ? normalize(cross(rdir, fallbackAxis))
         : normalize(latCross);
-    // Screen-projected bond axis: in the screen plane (perp to the ray) AND
-    // perp to lateral, i.e. the on-screen direction the bond runs. This stays a
-    // full unit length regardless of tilt, so pushing by r along it always
-    // clears the cap disc on screen (no foreshortening).
-    vec3 axisScreen = degenerate ? vec3(0.0) : normalize(cross(lateral, rdir));
+    // Screen-projected bond axis: perp to the ray AND perp to lateral, i.e. the
+    // on-screen direction the bond runs. In the degenerate (end-on) case the bond
+    // has no on-screen direction; cross(lateral, rdir) is now well-defined (lateral
+    // is a valid nonzero perpendicular). Stays unit length regardless of tilt, so
+    // pushing by r along it always clears the cap disc on screen (no foreshortening).
+    vec3 axisScreen = normalize(cross(lateral, rdir));
 
     // Outward sign along the (screen) axis: -1 at p1, +1 at p2. Lateral sign
     // combines the corner sign with the endpoint so vertices 0,1,2,3 trace the

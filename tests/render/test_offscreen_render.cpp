@@ -305,6 +305,41 @@ TEST(CylinderPipelineTest, TwoBondsRenderDistinctPerInstanceColors) {
     EXPECT_NE(red_top, blue_top);          // the two halves differ in color
 }
 
+TEST(CylinderPipelineTest, EndOnBondRendersNonEmpty) {
+    SKIP_IF_NO_GPU();
+    const QSize sz(128, 128);
+    RhiContext ctx(sz);
+    // Bond along Z (the camera's view axis at identity) -> end-on billboard.
+    BondData bonds;
+    bonds.add(QVector3D(0, 0, -0.6f), QVector3D(0, 0, 0.6f), 0.4f, Color(255, 0, 0), 0u);
+    BoundingBox box;
+    box.include(QVector3D(0, 0, -0.6f), 0.4f);
+    box.include(QVector3D(0, 0, 0.6f), 0.4f);
+    Camera cam;
+    cam.zoom_to(box);
+    MeshBuffer billboard = build_cylinder_billboard();
+    std::vector<float> inst = build_cylinder_instances(bonds);
+    CylinderPipeline pipeline(ctx.rhi(), ctx.render_pass_descriptor());
+    ImposterUniforms u;
+    u.view = cam.view_matrix();
+    u.projection = cam.projection_matrix(1.0f);
+    u.model_view = u.view;
+    QImage img = ctx.render_frame(QColor(0, 0, 0), [&](QRhiCommandBuffer* cb) {
+        QRhiResourceUpdateBatch* batch = ctx.rhi()->nextResourceUpdateBatch();
+        pipeline.upload(billboard, inst, batch);
+        pipeline.set_uniforms(u, batch);
+        cb->resourceUpdate(batch);
+        pipeline.draw(cb, sz);
+    });
+    ASSERT_FALSE(img.isNull());
+    // Count clearly-red pixels; a NaN billboard collapses to background (0 red).
+    int red = 0;
+    for (int y = 0; y < img.height(); ++y)
+        for (int x = 0; x < img.width(); ++x)
+            if (img.pixelColor(x, y).red() > 80) ++red;
+    EXPECT_GT(red, 20) << "end-on bond should render a visible cap silhouette";
+}
+
 TEST(ViewerValidation, RejectsNullModelWithoutPoisoning) {
     Viewer viewer(64, 64);
     EXPECT_THROW(viewer.add_model(nullptr), DataError);
