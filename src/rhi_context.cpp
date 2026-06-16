@@ -84,10 +84,25 @@ QImage RhiContext::render_frame(
                           backend_name().toStdString());
     }
 
+    // Guard: end the frame even if the draw callback or readback below throws,
+    // so a thrown exception cannot leave a half-open QRhi frame for the next
+    // render. The exception still propagates; only QRhi state is kept clean.
+    struct FrameGuard {
+        QRhi* rhi = nullptr;
+        ~FrameGuard() { if (rhi) rhi->endOffscreenFrame(); }
+    } frame_guard{rhi_.get()};
+
     const QColor clear = clear_color.toRgb();
     const QRhiDepthStencilClearValue ds_clear(1.0f, 0);
 
     cb->beginPass(rt_.get(), clear, ds_clear);
+    // Guard: end the pass even if the callback throws. Declared AFTER the frame
+    // guard so it destructs FIRST (the pass must end before the frame).
+    struct PassGuard {
+        QRhiCommandBuffer* cb = nullptr;
+        ~PassGuard() { if (cb) cb->endPass(nullptr); }
+    } pass_guard{cb};
+
     if (draw_callback) {
         draw_callback(cb);
     }
@@ -99,7 +114,11 @@ QImage RhiContext::render_frame(
     QRhiReadbackDescription rb(color_.get());
     batch->readBackTexture(rb, &readback);
 
+    // Success path: end the pass (with the readback batch) and the frame
+    // explicitly, then disarm both guards so their destructors are no-ops.
+    pass_guard.cb = nullptr;   // disarm before we end the pass ourselves
     cb->endPass(batch);
+    frame_guard.rhi = nullptr; // disarm before we end the frame ourselves
     const QRhi::FrameOpResult end_result = rhi_->endOffscreenFrame();
 
     if (!readback_done || readback.data.isEmpty()) {

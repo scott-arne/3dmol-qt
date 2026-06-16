@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <cmath>
+#include <stdexcept>
 
 #include "oe3dmol/rhi_context.h"
 #include "oe3dmol/render_errors.h"
@@ -95,6 +96,23 @@ TEST(RhiContextTest, ClearsToBackgroundColor) {
     EXPECT_EQ(img.width(), 64);
     EXPECT_EQ(img.height(), 64);
     QColor center = img.pixelColor(32, 32);
+    EXPECT_NEAR(center.red(), 10, 2);
+    EXPECT_NEAR(center.green(), 20, 2);
+    EXPECT_NEAR(center.blue(), 30, 2);
+}
+
+TEST(RhiContextTest, RecoversAfterThrowingDrawCallback) {
+    SKIP_IF_NO_GPU();
+    RhiContext ctx(QSize(32, 32));
+    // A draw callback that throws must not leave a half-open QRhi frame; a
+    // subsequent good render must still succeed.
+    EXPECT_THROW(
+        ctx.render_frame(QColor(0, 0, 0),
+                         [](QRhiCommandBuffer*) { throw std::runtime_error("boom"); }),
+        std::runtime_error);
+    QImage img = ctx.render_frame(QColor(10, 20, 30), [](QRhiCommandBuffer*) {});
+    ASSERT_FALSE(img.isNull());
+    QColor center = img.pixelColor(16, 16);
     EXPECT_NEAR(center.red(), 10, 2);
     EXPECT_NEAR(center.green(), 20, 2);
     EXPECT_NEAR(center.blue(), 30, 2);
