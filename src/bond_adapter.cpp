@@ -87,6 +87,8 @@ void accumulate_divergent_neighbor(const OEChem::OEMolBase* mol,
 // the shortest cycle; dedup rings by their sorted atom-index set so a fused
 // system (e.g. indazole) yields one cycle PER smallest ring. OE exposes no
 // smallest-ring atom-list enumerator, so we walk the bond graph ourselves.
+// Aromatic rings larger than MAX_RING atoms (e.g. macrocyclic/porphyrin
+// perimeters) are intentionally not decorated -- no circle, no warning.
 std::vector<std::vector<const OEChem::OEAtomBase*>> aromatic_rings(
     const OEChem::OEMolBase* mol) {
     constexpr unsigned MAX_RING = 8;

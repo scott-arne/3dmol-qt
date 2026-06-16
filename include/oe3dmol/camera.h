@@ -17,6 +17,11 @@ namespace oe3dmol {
 /// The camera orbits a target at a fixed distance with a quaternion
 /// orientation. At identity rotation it looks down -Z with +Y up, matching the
 /// legacy fit-only camera exactly (so offscreen output is unchanged).
+///
+/// \note All inputs are assumed finite. The camera performs no validation and
+///       never throws; passing NaN/inf positions or degenerate viewports yields
+///       undefined (but non-throwing) results. Callers in the data/render layers
+///       guard their inputs upstream.
 class Camera {
 public:
     /// \brief Frame a bounding box: set target to its center, fit the distance,

@@ -15,7 +15,7 @@ AtomData one_atom() {
 
 TEST(SphereImposterBuilderTest, EmptyInputProducesEmptyMesh) {
     MeshBuffer m = build_sphere_imposters(AtomData{});
-    EXPECT_EQ(m.vertex_count(), 0u);
+    EXPECT_EQ(m.vertices.size() / VertexLayout::FLOATS_PER_VERTEX, 0u);
     EXPECT_EQ(m.index_count(), 0u);
     EXPECT_TRUE(m.vertices.empty());
     EXPECT_TRUE(m.indices.empty());
@@ -23,7 +23,7 @@ TEST(SphereImposterBuilderTest, EmptyInputProducesEmptyMesh) {
 
 TEST(SphereImposterBuilderTest, FourVerticesPerAtom) {
     MeshBuffer m = build_sphere_imposters(one_atom());
-    EXPECT_EQ(m.vertex_count(), 4u);
+    EXPECT_EQ(m.vertices.size() / VertexLayout::FLOATS_PER_VERTEX, 4u);
 }
 
 TEST(SphereImposterBuilderTest, SixIndicesPerAtom) {
@@ -98,7 +98,7 @@ TEST(SphereImposterBuilderTest, SecondAtomIndicesAreOffset) {
     AtomData d = one_atom();
     d.add(QVector3D(0.0f, 0.0f, 0.0f), 1.0f, Color(0, 255, 0), 1u);
     MeshBuffer m = build_sphere_imposters(d);
-    EXPECT_EQ(m.vertex_count(), 8u);
+    EXPECT_EQ(m.vertices.size() / VertexLayout::FLOATS_PER_VERTEX, 8u);
     EXPECT_EQ(m.index_count(), 12u);
     EXPECT_EQ(m.indices[6], 4u);
     EXPECT_EQ(m.indices[7], 5u);

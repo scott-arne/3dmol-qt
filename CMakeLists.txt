@@ -156,6 +156,8 @@ target_include_directories(oe3dmol_render
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
 )
+# Qt6::GuiPrivate is required for QRhi (private API). This couples the build to a
+# matching Qt minor version; re-verify QRhi usage when upgrading Qt.
 target_link_libraries(oe3dmol_render
     PUBLIC
         oe3dmol_core

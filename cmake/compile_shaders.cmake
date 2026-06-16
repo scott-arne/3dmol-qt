@@ -1,6 +1,9 @@
 # Compiles GLSL shaders to .qsb using Qt's qsb tool.
 # Usage: oe3dmol_compile_shaders(<out_var> shader1.vert shader2.frag ...)
 
+# qsb ships in Qt's bin/. The HINTS cover the standard install layout; we also
+# fall back to PATH (NAMES qsb qsb-qt6). On non-standard layouts (some installer
+# trees) set QT_ROOT_DIR or ensure qsb is on PATH.
 find_program(QSB_EXECUTABLE NAMES qsb qsb-qt6
     HINTS "${Qt6_DIR}/../../../bin" "$ENV{QT_ROOT_DIR}/bin")
 if(NOT QSB_EXECUTABLE)

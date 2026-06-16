@@ -44,7 +44,8 @@ public:
     /// \brief Set the background color (default white, matching 3dmol).
     void set_background_color(const QColor& color) { background_ = color; }
 
-    /// \brief Fit the camera to all current models' bounds (3dmol parity hook).
+    /// \brief No-op: framing happens automatically at render() from the combined
+    /// scene bounds. Present for 3dmol.js API parity; calling it has no effect.
     void zoom_to();
 
     /// \brief Render the scene to a QImage.

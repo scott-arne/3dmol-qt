@@ -103,6 +103,7 @@ void MoleculeViewerWidget::releaseResources() {
 }
 
 void MoleculeViewerWidget::mousePressEvent(QMouseEvent* e) {
+    setFocus();  // claim keyboard focus so the 'R' re-fit shortcut works after a click
     last_pos_ = e->position().toPoint();
 }
 
