@@ -244,6 +244,10 @@ install(TARGETS oe3dmol_core oe3dmol_geometry oe3dmol_data oe3dmol_render oe3dmo
 )
 install(DIRECTORY include/oe3dmol DESTINATION include
     PATTERN "detail" EXCLUDE)
+# detail/ is internal and excluded above, EXCEPT validate.h: it is included by
+# the public, installed style.h / stick_style.h (their inline setters call
+# detail::require_finite_nonnegative), so consumers need it to compile.
+install(FILES include/oe3dmol/detail/validate.h DESTINATION include/oe3dmol/detail)
 install(EXPORT oe3dmol-targets
     FILE OE3DMOLTargets.cmake
     NAMESPACE OE3DMOL::
