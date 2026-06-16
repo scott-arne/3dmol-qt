@@ -41,5 +41,34 @@ TEST(BoundingBoxTest, BoundingRadiusCoversCorners) {
     EXPECT_NEAR(b.bounding_radius(), 1.7320508f, 1e-5f);
 }
 
+TEST(BoundingBoxTest, MergeIncludesAnotherBox) {
+    BoundingBox a;
+    a.include(QVector3D(0, 0, 0), 1.0f);   // [-1,1]^3
+    BoundingBox b;
+    b.include(QVector3D(5, 0, 0), 1.0f);   // x in [4,6]
+    a.include(b);
+    EXPECT_TRUE(a.valid());
+    EXPECT_NEAR(a.min().x(), -1.0f, 1e-4f);
+    EXPECT_NEAR(a.max().x(), 6.0f, 1e-4f);
+}
+
+TEST(BoundingBoxTest, MergeWithInvalidBoxIsNoOp) {
+    BoundingBox a;
+    a.include(QVector3D(0, 0, 0), 1.0f);
+    BoundingBox invalid;
+    a.include(invalid);
+    EXPECT_TRUE(a.valid());
+    EXPECT_NEAR(a.max().x(), 1.0f, 1e-4f);
+}
+
+TEST(BoundingBoxTest, MergeIntoInvalidAdoptsOther) {
+    BoundingBox a;  // invalid
+    BoundingBox b;
+    b.include(QVector3D(2, 2, 2), 0.5f);
+    a.include(b);
+    EXPECT_TRUE(a.valid());
+    EXPECT_NEAR(a.min().x(), 1.5f, 1e-4f);
+}
+
 }  // namespace test
 }  // namespace oe3dmol

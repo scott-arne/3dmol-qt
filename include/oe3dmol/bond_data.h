@@ -51,6 +51,7 @@ struct BondData {
 
     /// \brief Append all half-bonds from `other` (grows the bounding box via add()).
     void append(const BondData& other) {
+        reserve(size() + other.size());
         for (std::size_t i = 0; i < other.size(); ++i) {
             add(other.starts[i], other.ends[i], other.radii[i], other.colors[i],
                 other.source_bond_idx[i]);

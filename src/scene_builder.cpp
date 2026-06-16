@@ -18,11 +18,9 @@ void build_scene(const std::vector<SceneModel>& models, AtomData& atoms,
         for (const StyleSpec& spec : m.styles) {
             if (std::holds_alternative<SphereStyle>(spec)) {
                 AtomData d = build_atom_data(m.mol, std::get<SphereStyle>(spec));
-                // Fold into scene bounds here: the move fast-path below skips the
-                // per-element add() that would otherwise accumulate bounds.
-                for (std::size_t i = 0; i < d.size(); ++i) {
-                    bounds.include(d.positions[i], d.radii[i]);
-                }
+                // build_atom_data populated d.bounds via add(); merge it directly
+                // instead of re-walking every atom.
+                bounds.include(d.bounds);
                 if (atoms.size() == 0) {
                     atoms = std::move(d);
                 } else {
@@ -30,11 +28,7 @@ void build_scene(const std::vector<SceneModel>& models, AtomData& atoms,
                 }
             } else if (std::holds_alternative<StickStyle>(spec)) {
                 BondData b = build_bond_data(m.mol, std::get<StickStyle>(spec));
-                // Fold into scene bounds here (see sphere branch).
-                for (std::size_t i = 0; i < b.size(); ++i) {
-                    bounds.include(b.starts[i], b.radii[i]);
-                    bounds.include(b.ends[i], b.radii[i]);
-                }
+                bounds.include(b.bounds);
                 if (bonds.size() == 0) {
                     bonds = std::move(b);
                 } else {

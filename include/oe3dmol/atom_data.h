@@ -39,6 +39,11 @@ struct AtomData {
 
     /// \brief Append all atoms from `other` (grows the bounding box via add()).
     void append(const AtomData& other) {
+        const std::size_t total = size() + other.size();
+        positions.reserve(total);
+        radii.reserve(total);
+        colors.reserve(total);
+        source_idx.reserve(total);
         for (std::size_t i = 0; i < other.size(); ++i) {
             add(other.positions[i], other.radii[i], other.colors[i], other.source_idx[i]);
         }

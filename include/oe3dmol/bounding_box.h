@@ -16,6 +16,12 @@ public:
     /// \param radius Sphere radius (defaults to 0 for a point).
     void include(const QVector3D& center, float radius = 0.0f);
 
+    /// \brief Expand this box to also contain `other`. No-op if `other` is
+    /// invalid (empty). If this box is invalid and `other` is valid, this box
+    /// becomes a copy of `other`.
+    /// \param other Another box to merge in.
+    void include(const BoundingBox& other);
+
     /// \brief Whether any point has been included.
     bool valid() const { return valid_; }
 
