@@ -260,16 +260,22 @@ void emit_aromatic_circles(BondData& data, const OEChem::OEMolBase* mol,
 }  // namespace
 
 QVector3D bond_offset_dir(const QVector3D& axis, const QVector3D& ref) {
+    constexpr float MIN_SQ = 1.0e-8f;
+    // Zero (or near-zero) axis: there is no meaningful perpendicular plane, but
+    // the contract promises a finite unit vector. Return a documented canonical
+    // axis (+X) so callers never get a zero/NaN result.
+    if (axis.lengthSquared() < MIN_SQ) {
+        return QVector3D(1.0f, 0.0f, 0.0f);
+    }
     const QVector3D a = axis.normalized();
     QVector3D perp = ref - a * QVector3D::dotProduct(ref, a);
-    constexpr float MIN_PERP_SQ = 1.0e-8f;
-    if (perp.lengthSquared() >= MIN_PERP_SQ) {
+    if (perp.lengthSquared() >= MIN_SQ) {
         return perp.normalized();
     }
     // Collinear / no neighbor: pick any axis-perpendicular. cross with X, then Y;
     // at least one is non-degenerate since `a` cannot be parallel to both.
     QVector3D c = QVector3D::crossProduct(a, QVector3D(1, 0, 0));
-    if (c.lengthSquared() < MIN_PERP_SQ) {
+    if (c.lengthSquared() < MIN_SQ) {
         c = QVector3D::crossProduct(a, QVector3D(0, 1, 0));
     }
     return c.normalized();

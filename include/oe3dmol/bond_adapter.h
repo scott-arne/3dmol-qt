@@ -22,6 +22,10 @@ namespace oe3dmol {
 /// falls back to an arbitrary axis-perpendicular so callers always get a valid
 /// unit vector.
 ///
+/// When `axis` itself is zero (or near-zero), there is no perpendicular plane;
+/// the function returns the canonical +X axis (a finite unit vector) so the
+/// "always a valid unit vector" contract still holds.
+///
 /// \param axis Bond axis (need not be normalized).
 /// \param ref  Direction toward a neighbor atom, relative to a bond endpoint.
 /// \returns A unit vector perpendicular to `axis`.

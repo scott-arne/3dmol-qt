@@ -174,6 +174,23 @@ TEST(BondOffsetDirTest, CollinearNeighborFallsBackToValidPerpendicular) {
     EXPECT_NEAR(QVector3D::dotProduct(d, axis), 0.0f, 1e-4f);  // still perpendicular
 }
 
+TEST(BondOffsetDirTest, ZeroAxisReturnsFiniteUnitVector) {
+    QVector3D d = bond_offset_dir(QVector3D(0, 0, 0), QVector3D(0, 0, 0));
+    // Contract: always a finite unit vector, even for a zero axis + zero ref.
+    EXPECT_TRUE(std::isfinite(d.x()) && std::isfinite(d.y()) && std::isfinite(d.z()));
+    EXPECT_NEAR(d.length(), 1.0f, 1e-4f);
+    // Header contract: a zero axis returns the canonical +X axis specifically.
+    EXPECT_NEAR(d.x(), 1.0f, 1e-4f);
+    EXPECT_NEAR(d.y(), 0.0f, 1e-4f);
+    EXPECT_NEAR(d.z(), 0.0f, 1e-4f);
+}
+
+TEST(BondOffsetDirTest, ZeroAxisWithRefStillFiniteUnit) {
+    QVector3D d = bond_offset_dir(QVector3D(0, 0, 0), QVector3D(3, 0, 0));
+    EXPECT_TRUE(std::isfinite(d.x()) && std::isfinite(d.y()) && std::isfinite(d.z()));
+    EXPECT_NEAR(d.length(), 1.0f, 1e-4f);
+}
+
 TEST(BondAdapterTest, DoubleBondYieldsTwoParallelLines) {
     // C=O double bond, with a neighbor on carbon so the offset plane is defined.
     OEChem::OEGraphMol mol;
