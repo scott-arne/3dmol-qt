@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
+#include <limits>
+
+#include "oe3dmol/data_errors.h"
 #include "oe3dmol/stick_style.h"
 
 namespace oe3dmol {
@@ -37,6 +41,16 @@ TEST(StickStyleTest, AromaticStyleDefaultsKekuleAndIsChainable) {
     StickStyle& ref = s.aromatic_style(AromaticStyle::Delocalized);
     EXPECT_EQ(s.aromatic_style(), AromaticStyle::Delocalized);
     EXPECT_EQ(&ref, &s);
+}
+
+TEST(StickStyleValidation, RejectsNegativeAndNonFiniteRadius) {
+    EXPECT_THROW(StickStyle{}.radius(-1.0), DataError);
+    EXPECT_THROW(StickStyle{}.radius(std::nan("")), DataError);
+    EXPECT_THROW(StickStyle{}.radius(std::numeric_limits<double>::infinity()), DataError);
+}
+TEST(StickStyleValidation, AcceptsZeroAndPositive) {
+    EXPECT_NO_THROW(StickStyle{}.radius(0.0));
+    EXPECT_NO_THROW(StickStyle{}.radius(0.4));
 }
 
 }  // namespace test

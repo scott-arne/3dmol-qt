@@ -4,6 +4,7 @@
 /// \brief Stick (bond cylinder) representation style, mirroring 3dmol's StickStyleSpec.
 
 #include "oe3dmol/color_schemes.h"
+#include "oe3dmol/detail/validate.h"
 
 namespace oe3dmol {
 
@@ -23,8 +24,12 @@ enum class AromaticStyle { Kekule, Delocalized };
 /// Fluent setters return *this for 3dmol-style chaining.
 class StickStyle {
 public:
-    /// \brief Set the cylinder radius (Angstrom). \returns *this.
-    StickStyle& radius(double r) { radius_ = r; return *this; }
+    /// \brief Set the cylinder radius (Angstrom). Must be finite and >= 0.
+    /// \throws DataError otherwise. \returns *this.
+    StickStyle& radius(double r) {
+        radius_ = detail::require_finite_nonnegative(r, "StickStyle::radius");
+        return *this;
+    }
     /// \brief Set the color scheme. \returns *this.
     StickStyle& color(ColorScheme c) { color_ = c; return *this; }
     /// \brief Set opacity in [0,1]. \returns *this.

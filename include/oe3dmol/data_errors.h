@@ -8,7 +8,9 @@
 
 namespace oe3dmol {
 
-/// \brief Thrown when OpenEye input cannot be converted to AtomData.
+/// \brief Thrown on invalid data-layer input: an OpenEye molecule that cannot be
+/// converted to AtomData/BondData, or an out-of-contract style value (e.g. a
+/// negative or non-finite radius/scale).
 class DataError : public std::runtime_error {
 public:
     explicit DataError(const std::string& message) : std::runtime_error(message) {}

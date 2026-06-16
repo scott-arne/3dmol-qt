@@ -7,6 +7,7 @@
 #include <string>
 
 #include "oe3dmol/color_schemes.h"
+#include "oe3dmol/detail/validate.h"
 
 namespace oe3dmol {
 
@@ -16,10 +17,18 @@ namespace oe3dmol {
 /// Fluent setters return *this for 3dmol-style chaining.
 class SphereStyle {
 public:
-    /// \brief Set an explicit radius (overrides VDW lookup). \returns *this.
-    SphereStyle& radius(double r) { radius_ = r; return *this; }
-    /// \brief Set the VDW-radius scale factor. \returns *this.
-    SphereStyle& scale(double s) { scale_ = s; return *this; }
+    /// \brief Set an explicit radius (overrides VDW lookup). Must be finite and
+    /// >= 0. \throws DataError otherwise. \returns *this.
+    SphereStyle& radius(double r) {
+        radius_ = detail::require_finite_nonnegative(r, "SphereStyle::radius");
+        return *this;
+    }
+    /// \brief Set the VDW-radius scale factor. Must be finite and >= 0.
+    /// \throws DataError otherwise. \returns *this.
+    SphereStyle& scale(double s) {
+        scale_ = detail::require_finite_nonnegative(s, "SphereStyle::scale");
+        return *this;
+    }
     /// \brief Set the color scheme. \returns *this.
     SphereStyle& color(ColorScheme c) { color_ = c; return *this; }
     /// \brief Set opacity in [0,1]. \returns *this.
