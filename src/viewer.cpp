@@ -78,4 +78,14 @@ bool Viewer::render_to_png(const std::string& path) {
     return img.save(QString::fromStdString(path), "PNG");
 }
 
+void Viewer::save_png(const std::string& path) {
+    QImage img = render();  // throws RenderError on render failure
+    const QString qpath = QString::fromStdString(path);
+    if (!img.save(qpath, "PNG")) {
+        throw RenderError("Viewer: failed to write PNG to '" + path +
+                          "' (check path, permissions, and that the file is not a "
+                          "directory)");
+    }
+}
+
 }  // namespace oe3dmol

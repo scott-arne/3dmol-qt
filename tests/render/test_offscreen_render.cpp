@@ -472,6 +472,19 @@ TEST(ViewerCompositionTest, Sp1SphereStyleOverloadStillRenders) {
     EXPECT_GT(nonblack, 10);  // sphere rendered via SP1 overload
 }
 
+TEST(ViewerSavePng, ThrowsOnUnwritablePath) {
+    SKIP_IF_NO_GPU();
+    Viewer viewer(64, 64);
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* a = mol.NewAtom(6);
+    double c[3] = {0, 0, 0};
+    mol.SetCoords(a, c);
+    const OEChem::OEMolBase& base = mol;
+    viewer.add_model(&base);
+    // A path under a directory that does not exist cannot be written.
+    EXPECT_THROW(viewer.save_png("/this/path/does/not/exist/out.png"), RenderError);
+}
+
 TEST(SceneRendererTest, RendersSphereSceneNonEmpty) {
     SKIP_IF_NO_GPU();
     const QSize sz(128, 128);

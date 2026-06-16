@@ -21,6 +21,13 @@ class OEMolBase;
 namespace oe3dmol {
 
 /// \brief 3dmol.js-style viewer: add models, set styles, render to image.
+///
+/// \note One-shot oriented. Each render() recreates the QRhi device, both
+///       pipelines, and all GPU buffers, then tears them down. This is fine for
+///       a single CLI render but expensive for repeated renders of the same
+///       scene; for interactive/animated use prefer MoleculeViewerWidget (which
+///       keeps its renderer across frames). A persistent offscreen-session API
+///       is a planned future addition.
 class Viewer {
 public:
     /// \brief Construct a viewer with an offscreen framebuffer size.
@@ -32,6 +39,11 @@ public:
     Viewer& operator=(const Viewer&) = delete;
 
     /// \brief Add a molecule (non-owning). \returns its model index.
+    /// \note The Viewer stores a raw, non-owning pointer and re-reads the
+    ///       molecule from it at render() time. The caller MUST keep every added
+    ///       OEMolBase alive for the Viewer's entire lifetime, or render() will
+    ///       dereference a dangling pointer.
+    /// \throws DataError if mol is null or has no atoms.
     int add_model(const OEChem::OEMolBase* mol);
 
     /// \brief Apply a single sphere style to a model (whole-model selection).
@@ -54,6 +66,12 @@ public:
 
     /// \brief Render the scene and write a PNG. \returns true on success.
     bool render_to_png(const std::string& path);
+
+    /// \brief Render the scene and write a PNG, throwing on failure.
+    /// \param path Output file path.
+    /// \throws RenderError if rendering fails or the PNG cannot be written
+    ///         (path/permission/plugin), with the reason in the message.
+    void save_png(const std::string& path);
 
 private:
     QSize size_;
