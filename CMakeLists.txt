@@ -198,6 +198,38 @@ if(OE3DMOL_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
+# End-to-end example smoke test: run render_molecule on a tiny generated SDF and
+# assert it renders successfully. Needs both the test harness and the example
+# built; renders, so it is gated by OE3DMOL_BUILD_GPU_TESTS and requires a real
+# RHI device (sandbox OFF), like the render suite. Registered here (not under
+# tests/) because the render_molecule target is not defined until
+# add_subdirectory(examples) above.
+if(OE3DMOL_BUILD_TESTS AND OE3DMOL_BUILD_EXAMPLES AND OE3DMOL_BUILD_GPU_TESTS AND TARGET render_molecule)
+    set(_smoke_sdf "${CMAKE_CURRENT_BINARY_DIR}/smoke_co.sdf")
+    # A minimal valid V2000 SDF (two-atom C-O molecule with coordinates), written
+    # at configure time so the test needs no external fixture.
+    file(WRITE "${_smoke_sdf}"
+"smoke
+  oe3dmol
+
+  2  1  0  0  0  0  0  0  0  0999 V2000
+    0.0000    0.0000    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0
+    1.5000    0.0000    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0
+  1  2  1  0
+M  END
+$$$$
+")
+    add_test(
+        NAME example_render_molecule_smoke
+        COMMAND render_molecule "${_smoke_sdf}" "${CMAKE_CURRENT_BINARY_DIR}/smoke_out.png"
+    )
+    set_tests_properties(example_render_molecule_smoke PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        PASS_REGULAR_EXPRESSION "wrote "
+        FAIL_REGULAR_EXPRESSION "cannot|error:|failed"
+    )
+endif()
+
 # ---- Install / export ----
 include(CMakePackageConfigHelpers)
 
