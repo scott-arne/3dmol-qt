@@ -28,10 +28,16 @@ std::unique_ptr<QRhi> create_rhi() {
 
 }  // namespace
 
-RhiContext::RhiContext(const QSize& size) : size_(size) {
+RhiContext::RhiContext(const QSize& size, BackendPolicy policy) : size_(size) {
     rhi_ = create_rhi();
     if (!rhi_) {
         throw RenderError("RhiContext: failed to create any QRhi backend");
+    }
+    if (policy == BackendPolicy::RequireHardware && is_null_backend()) {
+        throw RenderError(
+            "RhiContext: no hardware GPU backend available (got Null). Offscreen "
+            "rendering requires a real device; pass BackendPolicy::AllowNull only "
+            "for construction/non-pixel tests.");
     }
 
     color_.reset(rhi_->newTexture(QRhiTexture::RGBA8, size_, 1,
@@ -63,6 +69,10 @@ RhiContext::~RhiContext() = default;
 
 QString RhiContext::backend_name() const {
     return rhi_ ? QString::fromLatin1(rhi_->backendName()) : QStringLiteral("none");
+}
+
+bool RhiContext::is_null_backend() const {
+    return rhi_ && rhi_->backend() == QRhi::Null;
 }
 
 QImage RhiContext::render_frame(

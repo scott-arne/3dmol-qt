@@ -51,9 +51,8 @@ private:
 inline bool gpu_available() {
     static const bool ok = []() {
         try {
-            RhiContext probe(QSize(8, 8));
-            return probe.backend_name().compare(QStringLiteral("Null"),
-                                                Qt::CaseInsensitive) != 0;
+            RhiContext probe(QSize(8, 8), BackendPolicy::AllowNull);
+            return !probe.is_null_backend();
         } catch (...) {
             return false;
         }
@@ -69,7 +68,26 @@ inline bool gpu_available() {
                             "render pixel assertions.";                        \
     } while (0)
 
+TEST(RhiContextTest, ConstructsUnderAllowNull) {
+    // Authoritative Null-backend test: AllowNull lets construction succeed even
+    // on a GPU-less host. No pixel assertion -- Null readback is not real
+    // rendering. Confirms the context constructs and reports a backend name.
+    RhiContext ctx(QSize(64, 64), BackendPolicy::AllowNull);
+    EXPECT_FALSE(ctx.backend_name().isEmpty());
+}
+
+TEST(RhiContextTest, RequireHardwareRejectsNull) {
+    // On a real-GPU host this constructs fine; on a Null-only host it throws.
+    // Either way, RequireHardware must NEVER silently accept Null.
+    if (gpu_available()) {
+        EXPECT_NO_THROW(RhiContext(QSize(8, 8), BackendPolicy::RequireHardware));
+    } else {
+        EXPECT_THROW(RhiContext(QSize(8, 8), BackendPolicy::RequireHardware), RenderError);
+    }
+}
+
 TEST(RhiContextTest, ClearsToBackgroundColor) {
+    SKIP_IF_NO_GPU();
     RhiContext ctx(QSize(64, 64));
     QImage img = ctx.render_frame(QColor(10, 20, 30), [](QRhiCommandBuffer*) {});
     ASSERT_FALSE(img.isNull());

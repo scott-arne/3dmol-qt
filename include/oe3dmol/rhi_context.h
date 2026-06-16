@@ -22,13 +22,22 @@ QT_END_NAMESPACE
 
 namespace oe3dmol {
 
+/// \brief Whether RhiContext may accept the QRhi::Null fallback backend.
+/// RequireHardware (default) throws if only Null is available, so production
+/// offscreen rendering fails loudly instead of producing an unrendered image.
+/// AllowNull lets construction/non-pixel tests opt into Null explicitly.
+enum class BackendPolicy { RequireHardware, AllowNull };
+
 /// \brief Headless RHI device with a single offscreen color+depth target.
 class RhiContext {
 public:
     /// \brief Create a headless RHI device and offscreen target of given size.
     /// \param size Pixel dimensions of the offscreen framebuffer.
-    /// \throws RenderError if the device or target cannot be created.
-    explicit RhiContext(const QSize& size);
+    /// \param policy Backend policy; RequireHardware (default) throws RenderError
+    ///        if only the QRhi::Null fallback is available.
+    /// \throws RenderError if the device or target cannot be created, or if
+    ///         policy is RequireHardware and only Null is available.
+    explicit RhiContext(const QSize& size, BackendPolicy policy = BackendPolicy::RequireHardware);
     ~RhiContext();
 
     RhiContext(const RhiContext&) = delete;
@@ -44,6 +53,8 @@ public:
     QSize size() const { return size_; }
     /// \brief Name of the active RHI backend (for diagnostics).
     QString backend_name() const;
+    /// \brief True if the active backend is the QRhi::Null fallback (no real GPU).
+    bool is_null_backend() const;
 
     /// \brief Render one frame: clear to clear_color, invoke draw_callback, read back.
     /// \param clear_color Background color.
