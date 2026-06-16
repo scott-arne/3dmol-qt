@@ -1,24 +1,14 @@
 #include "oe3dmol/sphere_imposter_pipeline.h"
 
 #include "oe3dmol/detail/checked_cast.h"
+#include "oe3dmol/detail/shader_resources.h"
 #include "oe3dmol/imposter_uniforms.h"
 #include "oe3dmol/render_errors.h"
 
 #include <QFile>
-#include <QtResource>
 
 #include <rhi/qrhi.h>
 #include <rhi/qshader.h>
-
-// Force registration of the embedded shader resources. The .qsb files live in a
-// generated translation unit whose static initializer is dropped by the linker
-// when oe3dmol_render is consumed as a static library, so reference it
-// explicitly. Q_INIT_RESOURCE expands to a declaration of the global
-// qInitResources_shaders symbol, so it must live at true global scope (outside
-// any named or anonymous namespace) for the symbol to resolve.
-static void ensure_shader_resources() {
-    Q_INIT_RESOURCE(shaders);
-}
 
 namespace oe3dmol {
 
@@ -40,7 +30,7 @@ QShader load_shader(const QString& path) {
 
 SphereImposterPipeline::SphereImposterPipeline(QRhi* rhi, QRhiRenderPassDescriptor* rp)
     : rhi_(rhi) {
-    ensure_shader_resources();
+    oe3dmol_ensure_shader_resources();
 
     ubuf_.reset(rhi_->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, IMPOSTER_UBO_SIZE));
     render_require(ubuf_ && ubuf_->create(),
