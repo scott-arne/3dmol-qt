@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <exception>
 
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QtGlobal>
 #include <QWheelEvent>
 
 #include <rhi/qrhi.h>
@@ -96,7 +98,20 @@ void MoleculeViewerWidget::render(QRhiCommandBuffer* cb) {
     const QSize px = renderTarget()->pixelSize();
     const QColor bg = background_.toRgb();
     cb->beginPass(renderTarget(), bg, {1.0f, 0});
-    renderer_->draw(cb, camera_, px);
+    // Render-layer exceptions must NOT escape through Qt's virtual render
+    // callback (undefined behavior). Catch, end the pass, and record the message.
+    try {
+        renderer_->draw(cb, camera_, px);
+        last_error_.clear();
+    } catch (const std::exception& e) {
+        last_error_ = QString::fromUtf8(e.what());
+        qWarning("MoleculeViewerWidget render failed: %s", e.what());
+    } catch (...) {
+        // A non-std::exception throw must still not escape Qt's virtual render
+        // callback (undefined behavior); record a generic message.
+        last_error_ = QStringLiteral("unknown render error");
+        qWarning("MoleculeViewerWidget render failed: unknown (non-std) exception");
+    }
     cb->endPass();
 }
 

@@ -10,6 +10,7 @@
 #include <QMatrix4x4>
 #include <QPoint>
 #include <QRhiWidget>
+#include <QString>
 
 #include "oe3dmol/atom_data.h"
 #include "oe3dmol/bond_data.h"
@@ -66,6 +67,11 @@ public:
     /// \brief Current camera distance from its target (read-only accessor).
     float camera_distance() const { return camera_.distance(); }
 
+    /// \brief The most recent render-layer error message, or empty if the last
+    /// render succeeded. Render exceptions are caught (they must not escape Qt's
+    /// virtual render callback) and recorded here instead of propagating.
+    QString last_error() const { return last_error_; }
+
 protected:
     void initialize(QRhiCommandBuffer* cb) override;
     void render(QRhiCommandBuffer* cb) override;
@@ -89,6 +95,7 @@ private:
     BondData bonds_;
     BoundingBox last_bounds_;  // most recent scene bounds, for zoom_to()
     bool camera_initialized_ = false;
+    QString last_error_;  // last render-layer error; empty after a good render
 
     QPoint last_pos_;
 };

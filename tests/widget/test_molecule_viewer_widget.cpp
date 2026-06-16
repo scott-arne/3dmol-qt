@@ -175,5 +175,13 @@ TEST(MoleculeViewerWidgetTest, AddModelRejectsEmptyMolecule) {
     EXPECT_THROW(w.add_model(&base), DataError);
 }
 
+TEST(MoleculeViewerWidgetTest, LastErrorEmptyByDefault) {
+    TestableWidget w;
+    EXPECT_TRUE(w.last_error().isEmpty());
+    // NOTE: exercising the catch in render() requires a live QRhi render callback,
+    // which the headless widget test environment cannot drive. The catch is
+    // verified by review; this pins the default-empty contract of last_error().
+}
+
 }  // namespace test
 }  // namespace oe3dmol
