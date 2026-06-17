@@ -14,6 +14,7 @@
 #include "oe3dmol/cylinder_builder.h"
 #include "oe3dmol/bond_data.h"
 #include "oe3dmol/viewer.h"
+#include "oe3dmol/offscreen_session.h"
 #include "oe3dmol/scene_renderer.h"
 #include "oe3dmol/mol_adapter.h"
 #include "oe3dmol/bond_adapter.h"
@@ -28,6 +29,64 @@
 
 namespace oe3dmol {
 namespace test {
+
+namespace {
+// A two-atom C-O molecule with coordinates (drawable: has atoms and a bond).
+OEChem::OEGraphMol make_co_session() {
+    OEChem::OEGraphMol mol;
+    OEChem::OEAtomBase* c = mol.NewAtom(6);
+    OEChem::OEAtomBase* o = mol.NewAtom(8);
+    double pc[3] = {0, 0, 0};
+    double po[3] = {1.5, 0, 0};
+    mol.SetCoords(c, pc);
+    mol.SetCoords(o, po);
+    mol.NewBond(c, o, 1);
+    return mol;
+}
+}  // namespace
+
+TEST(OffscreenSessionTest, ConstructorRejectsNonPositiveSize) {
+    EXPECT_THROW(OffscreenSession(0, 64), RenderError);
+    EXPECT_THROW(OffscreenSession(64, -1), RenderError);
+}
+
+TEST(OffscreenSessionTest, AddModelRejectsNullWithoutPoisoning) {
+    OffscreenSession s(64, 64);
+    EXPECT_THROW(s.add_model(nullptr), DataError);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    EXPECT_NO_THROW(s.add_model(&base));
+}
+
+TEST(OffscreenSessionTest, AddModelRejectsEmptyMolecule) {
+    OffscreenSession s(64, 64);
+    OEChem::OEGraphMol empty;
+    const OEChem::OEMolBase& base = empty;
+    EXPECT_THROW(s.add_model(&base), DataError);
+}
+
+TEST(OffscreenSessionTest, SceneBoundsValidAfterAddModel) {
+    OffscreenSession s(64, 64);
+    EXPECT_FALSE(s.scene_bounds().valid());  // nothing added yet
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);  // default SphereStyle -> drawable
+    EXPECT_TRUE(s.scene_bounds().valid());
+}
+
+TEST(OffscreenSessionTest, SetStyleOutOfRangeThrows) {
+    OffscreenSession s(64, 64);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);
+    EXPECT_THROW(s.set_style(5, SphereStyle{}), RenderError);
+    EXPECT_THROW(s.set_style(-1, SphereStyle{}), RenderError);
+}
+
+TEST(OffscreenSessionTest, ReframeIsNoOpWithoutGeometry) {
+    OffscreenSession s(64, 64);
+    EXPECT_NO_THROW(s.reframe());  // no models -> invalid bounds -> no-op, no crash
+}
 
 TEST(RenderErrorsTest, DeviceLostErrorIsRenderError) {
     // DeviceLostError must derive from RenderError so existing catch(RenderError)

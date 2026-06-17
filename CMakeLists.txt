@@ -148,6 +148,7 @@ add_library(oe3dmol_render
     src/cylinder_pipeline.cpp
     src/viewer.cpp
     src/scene_renderer.cpp
+    src/offscreen_session.cpp
     ${OE3DMOL_SHADER_QSB}
     ${OE3DMOL_SHADER_RES}
 )
