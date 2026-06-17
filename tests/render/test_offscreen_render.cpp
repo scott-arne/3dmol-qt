@@ -1302,5 +1302,53 @@ TEST(OffscreenSessionTest, SaveTurntableRejectsMissingDirectory) {
     EXPECT_THROW(s.save_turntable("/this/dir/does/not/exist", 8), RenderError);
 }
 
+TEST(OffscreenSessionTest, SaveTurntableWritesAllFrames) {
+    SKIP_IF_NO_GPU();
+    OffscreenSession s(64, 64);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    s.save_turntable(dir.path().toStdString(), 8);
+    for (int i = 0; i < 8; ++i) {
+        const QString path = dir.filePath(QString::asprintf("frame_%04d.png", i));
+        QImage img(path);
+        ASSERT_FALSE(img.isNull()) << "missing/invalid frame: " << path.toStdString();
+        EXPECT_EQ(img.width(), 64);
+        EXPECT_EQ(img.height(), 64);
+    }
+}
+
+TEST(OffscreenSessionTest, SaveTurntableRestoresCamera) {
+    SKIP_IF_NO_GPU();
+    OffscreenSession s(64, 64);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);
+    const QMatrix4x4 before = s.camera().view_matrix();
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    s.save_turntable(dir.path().toStdString(), 8);
+    EXPECT_EQ(s.camera().view_matrix(), before)
+        << "save_turntable must restore the camera to its pre-call state";
+}
+
+TEST(OffscreenSessionTest, SaveTurntableFramesDiffer) {
+    SKIP_IF_NO_GPU();
+    OffscreenSession s(64, 64);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);
+    QTemporaryDir dir;
+    ASSERT_TRUE(dir.isValid());
+    s.save_turntable(dir.path().toStdString(), 8);  // 45 deg per frame
+    QImage f0(dir.filePath("frame_0000.png"));
+    QImage f2(dir.filePath("frame_0002.png"));  // 90 deg turn
+    ASSERT_FALSE(f0.isNull());
+    ASSERT_FALSE(f2.isNull());
+    EXPECT_NE(f0, f2) << "frames across the sweep must differ (camera moved)";
+}
+
 }  // namespace test
 }  // namespace oe3dmol
