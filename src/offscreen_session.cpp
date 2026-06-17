@@ -1,10 +1,17 @@
 #include "oe3dmol/offscreen_session.h"
 
+#include <algorithm>
+#include <cmath>
+#include <iomanip>
+#include <sstream>
+
 #include "oe3dmol/detail/validate_molecule.h"
 #include "oe3dmol/render_errors.h"
 #include "oe3dmol/rhi_context.h"
 #include "oe3dmol/scene_renderer.h"
 
+#include <QDir>
+#include <QQuaternion>
 #include <rhi/qrhi.h>
 
 namespace oe3dmol {
@@ -115,6 +122,48 @@ void OffscreenSession::save_frame(const std::string& path) {
                           "' (check path, permissions, and that the file is not a "
                           "directory)");
     }
+}
+
+void OffscreenSession::save_turntable(const std::string& dir, int n_frames,
+                                      const QVector3D& axis, float total_degrees) {
+    if (n_frames <= 0) {
+        throw RenderError("OffscreenSession::save_turntable: n_frames must be positive");
+    }
+    if (axis.isNull()) {  // zero-length axis -> orbit rotation is undefined
+        throw RenderError("OffscreenSession::save_turntable: axis must be non-zero");
+    }
+    if (!std::isfinite(total_degrees)) {
+        throw RenderError("OffscreenSession::save_turntable: total_degrees must be finite");
+    }
+    const QDir out(QString::fromStdString(dir));
+    if (!out.exists()) {
+        throw RenderError("OffscreenSession::save_turntable: directory does not exist: '" +
+                          dir + "'");
+    }
+
+    // Zero-pad the frame index to fit the largest value; minimum width 4
+    // (frame_0000.png), widening only for very large sequences.
+    const int width =
+        std::max(4, static_cast<int>(std::to_string(n_frames - 1).size()));
+    const float step = total_degrees / static_cast<float>(n_frames);
+
+    // Snapshot the camera so the session is left exactly as found (Camera is
+    // copyable). Orbiting AFTER each save makes frame 0 the un-rotated view and
+    // the final step complete the sweep without duplicating frame 0.
+    const Camera saved = camera_;
+    try {
+        for (int i = 0; i < n_frames; ++i) {
+            std::ostringstream name;
+            name << "frame_" << std::setw(width) << std::setfill('0') << i << ".png";
+            const QString path = out.filePath(QString::fromStdString(name.str()));
+            save_frame(path.toStdString());  // reuses the full render + recovery path
+            camera_.orbit(QQuaternion::fromAxisAndAngle(axis, step));
+        }
+    } catch (...) {
+        camera_ = saved;  // restore even if a frame fails mid-sweep
+        throw;
+    }
+    camera_ = saved;
 }
 
 }  // namespace oe3dmol

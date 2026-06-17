@@ -11,6 +11,7 @@
 #include <QColor>
 #include <QImage>
 #include <QSize>
+#include <QVector3D>
 
 #include "oe3dmol/atom_data.h"
 #include "oe3dmol/bond_data.h"
@@ -76,6 +77,26 @@ public:
     QImage render_frame();
     /// \brief render_frame() + write a PNG. \throws RenderError on render/write failure.
     void save_frame(const std::string& path);
+
+    /// \brief Render a turntable: orbit the camera about `axis` through
+    /// `total_degrees`, split evenly into `n_frames`, writing each frame as a
+    /// zero-padded PNG (frame_0000.png, frame_0001.png, ...) into `dir`.
+    ///
+    /// The geometry is uploaded once and reused for every frame (only the camera
+    /// moves), so this is far cheaper than N independent renders. The camera is
+    /// restored to its pre-call state afterward, so the session is left exactly
+    /// as found.
+    ///
+    /// \param dir Existing directory to write into (NOT created).
+    /// \param n_frames Number of frames to render (must be > 0).
+    /// \param axis Orbit axis in world space (default +Y / vertical).
+    /// \param total_degrees Total sweep across all frames (default 360).
+    /// \throws RenderError if n_frames <= 0, axis is zero-length, total_degrees is
+    ///         non-finite, `dir` does not exist, there is no drawable geometry, a
+    ///         PNG write fails, or device-loss recovery fails.
+    void save_turntable(const std::string& dir, int n_frames,
+                        const QVector3D& axis = QVector3D(0.0f, 1.0f, 0.0f),
+                        float total_degrees = 360.0f);
 
 private:
     void rebuild_geometry();  // build_scene -> cache atoms/bonds/bounds, auto-frame, push if renderer exists

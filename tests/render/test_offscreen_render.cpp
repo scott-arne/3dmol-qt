@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 #include "oe3dmol/rhi_context.h"
@@ -24,6 +25,7 @@
 #include <QGuiApplication>
 #include <QImage>
 #include <QQuaternion>
+#include <QTemporaryDir>
 
 #include <rhi/qrhi.h>
 
@@ -1262,6 +1264,42 @@ TEST(OffscreenSessionTest, SaveFrameWritesPng) {
     const OEChem::OEMolBase& base = mol;
     s.add_model(&base);
     EXPECT_THROW(s.save_frame("/this/path/does/not/exist/out.png"), RenderError);
+}
+
+TEST(OffscreenSessionTest, SaveTurntableRejectsNonPositiveFrames) {
+    OffscreenSession s(64, 64);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);
+    EXPECT_THROW(s.save_turntable("/tmp", 0), RenderError);
+    EXPECT_THROW(s.save_turntable("/tmp", -3), RenderError);
+}
+
+TEST(OffscreenSessionTest, SaveTurntableRejectsZeroAxis) {
+    OffscreenSession s(64, 64);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);
+    EXPECT_THROW(s.save_turntable("/tmp", 8, QVector3D(0, 0, 0)), RenderError);
+}
+
+TEST(OffscreenSessionTest, SaveTurntableRejectsNonFiniteDegrees) {
+    OffscreenSession s(64, 64);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const float inf = std::numeric_limits<float>::infinity();
+    EXPECT_THROW(s.save_turntable("/tmp", 8, QVector3D(0, 1, 0), nan), RenderError);
+    EXPECT_THROW(s.save_turntable("/tmp", 8, QVector3D(0, 1, 0), inf), RenderError);
+}
+
+TEST(OffscreenSessionTest, SaveTurntableRejectsMissingDirectory) {
+    OffscreenSession s(64, 64);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);
+    EXPECT_THROW(s.save_turntable("/this/dir/does/not/exist", 8), RenderError);
 }
 
 }  // namespace test
