@@ -32,10 +32,11 @@ class SceneRenderer;
 /// -drag pan, middle-drag move the camera along its view axis (clip inspection).
 /// Reuses the SceneRenderer; models/styles mirror Viewer.
 ///
-/// \note Molecules are held by non-owning pointer and are re-read on every
-///       geometry rebuild (each set_style/add_model and each device-loss
-///       reinitialize). The caller MUST keep every added OEMolBase alive for
-///       the entire lifetime of the widget.
+/// \note Molecules added via the raw-pointer add_model are held non-owning and
+///       re-read on every geometry rebuild (each set_style/add_model and each
+///       device-loss reinitialize); the caller MUST keep every such OEMolBase
+///       alive for the entire lifetime of the widget. The shared_ptr add_model
+///       overload instead co-owns the molecule, lifting that requirement.
 class MoleculeViewerWidget : public QRhiWidget {
     Q_OBJECT
 public:

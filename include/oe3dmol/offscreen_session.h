@@ -36,8 +36,10 @@ class SceneRenderer;
 /// re-uploads geometry only when models/styles change (camera-only frames are
 /// cheap redraws). The caller drives the camera and owns the per-frame loop.
 ///
-/// \note Models are held by non-owning pointer (re-read at render time); the
-///       caller MUST keep every added OEMolBase alive for the session's lifetime.
+/// \note Molecules added via the raw-pointer add_model are held non-owning
+///       (re-read at render time); the caller MUST keep every such OEMolBase
+///       alive for the session's lifetime. The shared_ptr add_model overload
+///       instead co-owns the molecule, lifting that requirement.
 class OffscreenSession {
 public:
     /// \brief Construct a session with a fixed offscreen framebuffer size.
