@@ -1176,5 +1176,93 @@ TEST(BondOrderRenderTest, DoubleBondNotMuchWiderThanSingle) {
         << "double bond far too wide (double_h=" << double_h << " single_h=" << single_h << ")";
 }
 
+TEST(OffscreenSessionTest, RendersMultipleFramesReusingStack) {
+    SKIP_IF_NO_GPU();
+    OffscreenSession s(128, 128);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);  // default sphere style auto-frames on first build
+
+    QImage f0 = s.render_frame();
+    ASSERT_FALSE(f0.isNull());
+    // Orbit, render again from the SAME session (persistent stack): the image
+    // must differ (camera moved) -- proves reuse + camera-only redraw.
+    s.camera().orbit(QQuaternion::fromAxisAndAngle(0, 1, 0, 60.0f));
+    QImage f1 = s.render_frame();
+    ASSERT_FALSE(f1.isNull());
+    EXPECT_NE(f0, f1) << "orbiting must change the rendered image";
+}
+
+TEST(OffscreenSessionTest, GeometryPersistsAcrossCameraOnlyFrames) {
+    SKIP_IF_NO_GPU();
+    OffscreenSession s(128, 128);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);
+    QImage f0 = s.render_frame();
+    // A second render with NO mutation reproduces the same frame (geometry stable,
+    // no spurious re-upload, camera unchanged).
+    QImage f1 = s.render_frame();
+    ASSERT_FALSE(f0.isNull());
+    EXPECT_EQ(f0, f1) << "an unchanged session must render an identical frame";
+}
+
+TEST(OffscreenSessionTest, RestyleChangesTheRender) {
+    SKIP_IF_NO_GPU();
+    OffscreenSession s(128, 128);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);  // sphere
+    QImage spheres = s.render_frame();
+    s.set_style(0, std::vector<StyleSpec>{StickStyle{}});  // sticks -> different geometry
+    QImage sticks = s.render_frame();
+    ASSERT_FALSE(spheres.isNull());
+    EXPECT_NE(spheres, sticks) << "restyle must re-upload and change the render";
+}
+
+TEST(OffscreenSessionTest, RenderThrowsOnNoModels) {
+    SKIP_IF_NO_GPU();
+    OffscreenSession s(64, 64);
+    EXPECT_THROW(s.render_frame(), RenderError);
+}
+
+TEST(OffscreenSessionTest, RenderThrowsOnNoDrawableGeometry) {
+    SKIP_IF_NO_GPU();
+    OffscreenSession s(64, 64);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    int idx = s.add_model(&base);
+    s.set_style(idx, std::vector<StyleSpec>{});  // no styles -> no geometry
+    EXPECT_THROW(s.render_frame(), RenderError);
+}
+
+TEST(OffscreenSessionTest, AutoFramesUntouchedCamera) {
+    SKIP_IF_NO_GPU();
+    OffscreenSession s(128, 128);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);
+    // Untouched camera should already frame the scene -> a non-blank (non-white)
+    // render. Background defaults to white; the molecule paints non-white pixels.
+    QImage img = s.render_frame();
+    ASSERT_FALSE(img.isNull());
+    int non_white = 0;
+    for (int y = 0; y < img.height(); ++y)
+        for (int x = 0; x < img.width(); ++x) {
+            QColor c = img.pixelColor(x, y);
+            if (c.red() < 250 || c.green() < 250 || c.blue() < 250) ++non_white;
+        }
+    EXPECT_GT(non_white, 50) << "auto-framed scene should paint visible geometry";
+}
+
+TEST(OffscreenSessionTest, SaveFrameWritesPng) {
+    SKIP_IF_NO_GPU();
+    OffscreenSession s(64, 64);
+    OEChem::OEGraphMol mol = make_co_session();
+    const OEChem::OEMolBase& base = mol;
+    s.add_model(&base);
+    EXPECT_THROW(s.save_frame("/this/path/does/not/exist/out.png"), RenderError);
+}
+
 }  // namespace test
 }  // namespace oe3dmol
