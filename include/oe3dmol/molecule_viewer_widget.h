@@ -60,6 +60,13 @@ public:
     /// model with valid bounds has been added.
     void zoom_to();
 
+    /// \brief Read-only access to the live camera. Lets the current interactive
+    /// view (orientation, target, distance) be handed to an offscreen render --
+    /// e.g. copying it into an OffscreenSession to render a turntable from the
+    /// view the user is currently looking at. Mirrors view_matrix() /
+    /// camera_distance(); does not trigger a repaint.
+    const Camera& camera() const { return camera_; }
+
     /// \brief Current camera view matrix (world -> view). Read-only camera-state
     /// accessor; does not trigger a repaint.
     QMatrix4x4 view_matrix() const { return camera_.view_matrix(); }

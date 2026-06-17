@@ -9,15 +9,18 @@
 
 #include <QApplication>
 #include <QComboBox>
+#include <QFileDialog>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QVBoxLayout>
 #include <QWidget>
 
 #include <oechem.h>
 
 #include "oe3dmol/molecule_viewer_widget.h"
+#include "oe3dmol/offscreen_session.h"
 #include "oe3dmol/stick_style.h"
 #include "oe3dmol/style_spec.h"
 #include "oe3dmol/viewer.h"
@@ -170,6 +173,8 @@ int main(int argc, char** argv) {
     arom_combo->addItem(QStringLiteral("Delocalized"));  // index 1
     toolbar->addWidget(arom_label);
     toolbar->addWidget(arom_combo);
+    auto* animate_button = new QPushButton(QStringLiteral("Test Animate"));
+    toolbar->addWidget(animate_button);
     toolbar->addWidget(hint);
     toolbar->addStretch(1);
 
@@ -201,6 +206,40 @@ int main(int argc, char** argv) {
                              viewer->set_style(id, styles_for(combo->currentIndex(), *arom));
                      });
     combo->setCurrentIndex(initial_rep);  // reflect the CLI selection in the control
+
+    // "Test Animate": render a 180-degree turntable (36 frames, 5 deg each) of the
+    // current view to a chosen directory, via an offscreen session that adopts the
+    // widget's live camera so the animation starts from exactly what's on screen.
+    QObject::connect(animate_button, &QPushButton::clicked,
+                     [&window, viewer, &mols, combo, arom]() {
+        const QString dir = QFileDialog::getExistingDirectory(
+            &window, QStringLiteral("Choose a directory to save animation frames"));
+        if (dir.isEmpty()) {
+            return;  // user cancelled
+        }
+        try {
+            oe3dmol::OffscreenSession session(viewer->width(), viewer->height());
+            const auto styles = styles_for(combo->currentIndex(), *arom);
+            for (const OEChem::OEGraphMol& m : mols) {
+                const OEChem::OEMolBase& base = m;
+                const int model = session.add_model(&base);
+                session.set_style(model, styles);
+            }
+            // Adopt the live view AFTER add_model so it overrides the session's
+            // one-time auto-frame; the turntable then spins from the current angle.
+            session.camera() = viewer->camera();
+            constexpr int kFrames = 36;  // 36 * 5 deg = 180 deg
+            session.save_turntable(dir.toStdString(), kFrames,
+                                   QVector3D(0.0f, 1.0f, 0.0f), 180.0f);
+            QMessageBox::information(
+                &window, QStringLiteral("Test Animate"),
+                QStringLiteral("Wrote %1 frames to:\n%2").arg(kFrames).arg(dir));
+        } catch (const std::exception& e) {
+            QMessageBox::critical(&window, QStringLiteral("Test Animate"),
+                                  QStringLiteral("Animation failed: %1")
+                                      .arg(QString::fromUtf8(e.what())));
+        }
+    });
 
     window.setWindowTitle(QStringLiteral("oe3dmol viewer - %1").arg(input.c_str()));
     window.resize(800, 640);

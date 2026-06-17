@@ -160,6 +160,27 @@ TEST(MoleculeViewerWidgetTest, RKeyReframesAfterOrbit) {
         << "'R' should restore the framed view";
 }
 
+TEST(MoleculeViewerWidgetTest, CameraAccessorReflectsLiveState) {
+    TestableWidget w;
+    w.resize(200, 200);
+    OEChem::OEGraphMol mol = make_diatomic();
+    const OEChem::OEMolBase& base = mol;
+    w.add_model(&base);
+
+    // The camera() accessor exposes the SAME live camera the widget renders with:
+    // its view matrix and distance match the dedicated accessors, and it tracks
+    // interactive changes (an orbit moves it). This is the handoff an offscreen
+    // turntable copies (session.camera() = widget.camera()).
+    EXPECT_EQ(w.camera().view_matrix(), w.view_matrix());
+    EXPECT_EQ(w.camera().distance(), w.camera_distance());
+
+    const QMatrix4x4 framed = w.camera().view_matrix();
+    w.press(QPoint(50, 50), Qt::LeftButton);
+    w.drag(QPoint(120, 90), Qt::LeftButton);
+    EXPECT_TRUE(matrices_differ(framed, w.camera().view_matrix()))
+        << "camera() must reflect the live (orbited) camera state";
+}
+
 TEST(MoleculeViewerWidgetTest, AddModelRejectsNullWithoutPoisoning) {
     TestableWidget w;
     EXPECT_THROW(w.add_model(nullptr), DataError);
