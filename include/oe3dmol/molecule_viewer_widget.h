@@ -21,6 +21,7 @@
 
 namespace OEChem {
 class OEMolBase;
+class OEGraphMol;
 }
 
 namespace oe3dmol {
@@ -43,6 +44,13 @@ public:
 
     /// \brief Add a molecule (non-owning). \returns its model index.
     int add_model(const OEChem::OEMolBase* mol);
+    /// \brief Add a molecule the widget CO-OWNS (shared ownership). Unlike the
+    /// raw-pointer overload, the widget holds a reference for its whole lifetime,
+    /// so the caller need not keep the molecule alive separately. Prefer this
+    /// when the molecule's lifetime is hard to guarantee.
+    /// \returns its model index.
+    /// \throws DataError if mol is null or has no atoms.
+    int add_model(std::shared_ptr<const OEChem::OEGraphMol> mol);
     /// \brief Apply a single sphere style to a model.
     void set_style(int model_index, const SphereStyle& style);
     /// \brief Apply a list of styles to a model (sphere + stick = ball-and-stick).

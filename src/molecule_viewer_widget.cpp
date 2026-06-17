@@ -9,6 +9,7 @@
 #include <QtGlobal>
 #include <QWheelEvent>
 
+#include <oechem.h>
 #include <rhi/qrhi.h>
 
 #include "oe3dmol/arcball.h"
@@ -30,6 +31,16 @@ MoleculeViewerWidget::~MoleculeViewerWidget() = default;
 int MoleculeViewerWidget::add_model(const OEChem::OEMolBase* mol) {
     detail::require_renderable_molecule(mol, "MoleculeViewerWidget::add_model");
     models_.push_back(SceneModel{mol, {SphereStyle{}}, nullptr});
+    const int index = static_cast<int>(models_.size()) - 1;
+    refresh();
+    return index;
+}
+
+int MoleculeViewerWidget::add_model(std::shared_ptr<const OEChem::OEGraphMol> mol) {
+    const OEChem::OEMolBase* base =
+        mol ? &static_cast<const OEChem::OEMolBase&>(*mol) : nullptr;
+    detail::require_renderable_molecule(base, "MoleculeViewerWidget::add_model");
+    models_.push_back(SceneModel{base, {SphereStyle{}}, std::move(mol)});
     const int index = static_cast<int>(models_.size()) - 1;
     refresh();
     return index;

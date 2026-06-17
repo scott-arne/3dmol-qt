@@ -7,6 +7,8 @@
 #include <QPointF>
 #include <QWheelEvent>
 
+#include <memory>
+
 #include <oechem.h>
 
 #include "oe3dmol/molecule_viewer_widget.h"
@@ -211,6 +213,28 @@ TEST(MoleculeViewerWidgetTest, EmptyStyleVectorRecordsErrorWithoutThrow) {
     w.add_model(&base);
     EXPECT_NO_THROW(w.set_style(0, std::vector<StyleSpec>{}));  // no styles
     EXPECT_FALSE(w.last_error().isEmpty());
+}
+
+TEST(MoleculeViewerWidgetTest, AddModelSharedValidates) {
+    TestableWidget w;
+    std::shared_ptr<const OEChem::OEGraphMol> nullmol;
+    EXPECT_THROW(w.add_model(nullmol), DataError);
+    auto empty = std::make_shared<OEChem::OEGraphMol>();
+    EXPECT_THROW(w.add_model(empty), DataError);
+    // Not poisoned: a valid shared model still works afterward.
+    auto good = std::make_shared<OEChem::OEGraphMol>(make_diatomic());
+    EXPECT_NO_THROW(w.add_model(good));
+}
+
+TEST(MoleculeViewerWidgetTest, SharedModelOutlivesCallerReference) {
+    TestableWidget w;
+    auto mol = std::make_shared<OEChem::OEGraphMol>(make_diatomic());
+    w.add_model(mol);   // widget co-owns
+    mol.reset();        // drop the caller's reference; raw path would dangle on rebuild
+    // set_style triggers rebuild_geometry(), which re-reads the molecule pointer.
+    EXPECT_NO_THROW(w.set_style(0, SphereStyle{}));
+    EXPECT_TRUE(w.last_error().isEmpty())
+        << "co-owned molecule must still rebuild after the caller dropped it";
 }
 
 }  // namespace test
