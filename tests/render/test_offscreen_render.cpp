@@ -1375,5 +1375,28 @@ TEST(OffscreenSessionTest, SaveTurntableFramesDiffer) {
     EXPECT_NE(f0, f2) << "frames across the sweep must differ (camera moved)";
 }
 
+TEST(OffscreenSessionTest, AddModelSharedValidates) {
+    OffscreenSession s(64, 64);
+    std::shared_ptr<const OEChem::OEGraphMol> nullmol;
+    EXPECT_THROW(s.add_model(nullmol), DataError);
+    auto empty = std::make_shared<OEChem::OEGraphMol>();
+    EXPECT_THROW(s.add_model(empty), DataError);
+    // A valid shared model reaches build_scene like the raw path: index 0, valid bounds.
+    auto good = std::make_shared<OEChem::OEGraphMol>(make_co_session());
+    const int idx = s.add_model(good);
+    EXPECT_EQ(idx, 0);
+    EXPECT_TRUE(s.scene_bounds().valid());
+}
+
+TEST(OffscreenSessionTest, SharedModelOutlivesCallerReference) {
+    SKIP_IF_NO_GPU();
+    OffscreenSession s(64, 64);
+    auto mol = std::make_shared<OEChem::OEGraphMol>(make_co_session());
+    s.add_model(mol);   // session co-owns
+    mol.reset();        // drop the caller's reference; raw path would dangle
+    QImage img = s.render_frame();
+    EXPECT_FALSE(img.isNull()) << "co-owned molecule must survive the caller dropping it";
+}
+
 }  // namespace test
 }  // namespace oe3dmol

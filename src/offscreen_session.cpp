@@ -10,6 +10,8 @@
 #include "oe3dmol/rhi_context.h"
 #include "oe3dmol/scene_renderer.h"
 
+#include <oechem.h>
+
 #include <QDir>
 #include <QQuaternion>
 #include <rhi/qrhi.h>
@@ -27,6 +29,15 @@ OffscreenSession::~OffscreenSession() = default;
 int OffscreenSession::add_model(const OEChem::OEMolBase* mol) {
     detail::require_renderable_molecule(mol, "OffscreenSession::add_model");
     models_.push_back(SceneModel{mol, {SphereStyle{}}, nullptr});
+    rebuild_geometry();
+    return static_cast<int>(models_.size()) - 1;
+}
+
+int OffscreenSession::add_model(std::shared_ptr<const OEChem::OEGraphMol> mol) {
+    const OEChem::OEMolBase* base =
+        mol ? &static_cast<const OEChem::OEMolBase&>(*mol) : nullptr;
+    detail::require_renderable_molecule(base, "OffscreenSession::add_model");
+    models_.push_back(SceneModel{base, {SphereStyle{}}, std::move(mol)});
     rebuild_geometry();
     return static_cast<int>(models_.size()) - 1;
 }
