@@ -36,3 +36,23 @@ jobs:
         # Render tests self-skip on the Null backend; sandbox must be OFF so the
         # real GPU is used. --output-on-failure surfaces any pixel-diff failures.
         run: ctest --test-dir build --output-on-failure
+
+      - name: Verify GPU tests ran
+        # ctest treats a gtest GTEST_SKIP() as a pass, so render pixel tests that
+        # self-skip on a Null backend would let CI go green WITHOUT exercising the
+        # GPU. On a runner tagged `gpu` that is a misconfiguration, not an excuse:
+        # fail loudly if any render test skipped so a green run always means the
+        # GPU path actually ran.
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -o pipefail
+          ./build/tests/render/oe3dmol_render_tests 2>&1 | tee render-test.log
+          if grep -q '\[  SKIPPED \]' render-test.log; then
+            echo "::error::Render tests were SKIPPED — no real GPU/RHI backend was"\
+                 "available on this runner. A 'gpu'-tagged runner must provide a"\
+                 "working hardware device; a Null-backend fallback means the GPU"\
+                 "render path was NOT tested. Failing the build."
+            exit 1
+          fi
+          echo "All render tests ran on a real GPU backend (no skips)."
