@@ -25,7 +25,7 @@ OEChem::OEGraphMol make_co() {
 TEST(SceneBuilderTest, SphereStyleProducesAtomsAndBounds) {
     OEChem::OEGraphMol mol = make_co();
     const OEChem::OEMolBase& base = mol;
-    std::vector<SceneModel> models{SceneModel{&base, {SphereStyle{}}}};
+    std::vector<SceneModel> models{SceneModel{&base, {SphereStyle{}}, nullptr}};
 
     AtomData atoms;
     BondData bonds;
@@ -40,7 +40,7 @@ TEST(SceneBuilderTest, SphereStyleProducesAtomsAndBounds) {
 TEST(SceneBuilderTest, StickStyleProducesHalfBonds) {
     OEChem::OEGraphMol mol = make_co();
     const OEChem::OEMolBase& base = mol;
-    std::vector<SceneModel> models{SceneModel{&base, {StickStyle{}}}};
+    std::vector<SceneModel> models{SceneModel{&base, {StickStyle{}}, nullptr}};
 
     AtomData atoms;
     BondData bonds;
@@ -56,8 +56,8 @@ TEST(SceneBuilderTest, MultipleModelsAccumulateIntoOneBuffer) {
     const OEChem::OEMolBase& base = mol;
     // Two models, each sphere-styled -> atoms accumulate (move first, append second).
     std::vector<SceneModel> models{
-        SceneModel{&base, {SphereStyle{}}},
-        SceneModel{&base, {SphereStyle{}}},
+        SceneModel{&base, {SphereStyle{}}, nullptr},
+        SceneModel{&base, {SphereStyle{}}, nullptr},
     };
 
     AtomData atoms;
@@ -74,8 +74,8 @@ TEST(SceneBuilderTest, MultipleStickModelsAccumulateHalfBonds) {
     const OEChem::OEMolBase& base = mol;
     // Two stick-styled models -> bonds accumulate via the append (non-move) path.
     std::vector<SceneModel> models{
-        SceneModel{&base, {StickStyle{}}},
-        SceneModel{&base, {StickStyle{}}},
+        SceneModel{&base, {StickStyle{}}, nullptr},
+        SceneModel{&base, {StickStyle{}}, nullptr},
     };
 
     AtomData atoms;

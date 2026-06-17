@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 
 #include "oe3dmol/rhi_context.h"
@@ -560,6 +561,30 @@ TEST(ViewerSavePng, ThrowsOnUnwritablePath) {
     viewer.add_model(&base);
     // A path under a directory that does not exist cannot be written.
     EXPECT_THROW(viewer.save_png("/this/path/does/not/exist/out.png"), RenderError);
+}
+
+TEST(ViewerSharedOwnership, NullSharedThrows) {
+    Viewer viewer(64, 64);
+    std::shared_ptr<const OEChem::OEGraphMol> mol;  // null
+    EXPECT_THROW(viewer.add_model(mol), DataError);
+}
+
+TEST(ViewerSharedOwnership, EmptySharedThrowsWithoutPoisoning) {
+    Viewer viewer(64, 64);
+    auto empty = std::make_shared<OEChem::OEGraphMol>();
+    EXPECT_THROW(viewer.add_model(empty), DataError);  // shared_ptr<OEGraphMol> -> shared_ptr<const OEGraphMol>
+    auto good = std::make_shared<OEChem::OEGraphMol>(make_co_session());
+    EXPECT_NO_THROW(viewer.add_model(good));
+}
+
+TEST(ViewerSharedOwnership, SharedModelOutlivesCallerReference) {
+    SKIP_IF_NO_GPU();
+    Viewer viewer(64, 64);
+    auto mol = std::make_shared<OEChem::OEGraphMol>(make_co_session());
+    viewer.add_model(mol);   // viewer co-owns
+    mol.reset();             // drop the caller's reference; raw path would dangle here
+    QImage img = viewer.render();
+    EXPECT_FALSE(img.isNull()) << "co-owned molecule must survive the caller dropping it";
 }
 
 TEST(SceneRendererTest, RendersSphereSceneNonEmpty) {

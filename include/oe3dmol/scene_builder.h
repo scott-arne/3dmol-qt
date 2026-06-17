@@ -3,6 +3,7 @@
 /// \file scene_builder.h
 /// \brief Shared model -> AtomData/BondData scene assembly for all viewers.
 
+#include <memory>
 #include <vector>
 
 #include "oe3dmol/atom_data.h"
@@ -16,10 +17,16 @@ class OEMolBase;
 
 namespace oe3dmol {
 
-/// \brief A molecule (non-owning) plus the styles applied to it.
+/// \brief A molecule plus the styles applied to it.
+///
+/// `mol` is the access pointer build_scene reads (always set). `owned` is null
+/// for a borrowed molecule (the caller guarantees its lifetime) and set for a
+/// co-owned molecule (a type-erased token pinning it alive); when set, `mol`
+/// points into the object `owned` keeps alive.
 struct SceneModel {
     const OEChem::OEMolBase* mol = nullptr;
     std::vector<StyleSpec> styles;
+    std::shared_ptr<const void> owned;  // null = borrowed; set = co-owned (lifetime token)
 };
 
 /// \brief Assemble combined sphere atoms, stick half-bonds, and scene bounds

@@ -16,6 +16,7 @@
 
 namespace OEChem {
 class OEMolBase;
+class OEGraphMol;
 }
 
 namespace oe3dmol {
@@ -45,6 +46,14 @@ public:
     ///       dereference a dangling pointer.
     /// \throws DataError if mol is null or has no atoms.
     int add_model(const OEChem::OEMolBase* mol);
+
+    /// \brief Add a molecule the Viewer CO-OWNS (shared ownership). Unlike the
+    /// raw-pointer overload, the Viewer holds a reference for its whole lifetime,
+    /// so the caller need not keep the molecule alive separately. Prefer this
+    /// when the molecule's lifetime is hard to guarantee.
+    /// \returns its model index.
+    /// \throws DataError if mol is null or has no atoms.
+    int add_model(std::shared_ptr<const OEChem::OEGraphMol> mol);
 
     /// \brief Apply a single sphere style to a model (whole-model selection).
     void set_style(int model_index, const SphereStyle& style);

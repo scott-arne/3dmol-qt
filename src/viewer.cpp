@@ -7,6 +7,7 @@
 #include "oe3dmol/scene_builder.h"
 #include "oe3dmol/scene_renderer.h"
 
+#include <oechem.h>
 #include <rhi/qrhi.h>
 
 namespace oe3dmol {
@@ -21,7 +22,15 @@ Viewer::~Viewer() = default;
 
 int Viewer::add_model(const OEChem::OEMolBase* mol) {
     detail::require_renderable_molecule(mol, "Viewer::add_model");
-    models_.push_back(SceneModel{mol, {SphereStyle{}}});
+    models_.push_back(SceneModel{mol, {SphereStyle{}}, nullptr});
+    return static_cast<int>(models_.size()) - 1;
+}
+
+int Viewer::add_model(std::shared_ptr<const OEChem::OEGraphMol> mol) {
+    const OEChem::OEMolBase* base =
+        mol ? &static_cast<const OEChem::OEMolBase&>(*mol) : nullptr;
+    detail::require_renderable_molecule(base, "Viewer::add_model");
+    models_.push_back(SceneModel{base, {SphereStyle{}}, std::move(mol)});
     return static_cast<int>(models_.size()) - 1;
 }
 

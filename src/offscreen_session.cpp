@@ -26,7 +26,7 @@ OffscreenSession::~OffscreenSession() = default;
 
 int OffscreenSession::add_model(const OEChem::OEMolBase* mol) {
     detail::require_renderable_molecule(mol, "OffscreenSession::add_model");
-    models_.push_back(SceneModel{mol, {SphereStyle{}}});
+    models_.push_back(SceneModel{mol, {SphereStyle{}}, nullptr});
     rebuild_geometry();
     return static_cast<int>(models_.size()) - 1;
 }
