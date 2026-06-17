@@ -79,7 +79,12 @@ QImage RhiContext::render_frame(
     const QColor& clear_color,
     const std::function<void(QRhiCommandBuffer*)>& draw_callback) {
     QRhiCommandBuffer* cb = nullptr;
-    if (rhi_->beginOffscreenFrame(&cb) != QRhi::FrameOpSuccess) {
+    const QRhi::FrameOpResult begin_result = rhi_->beginOffscreenFrame(&cb);
+    if (begin_result != QRhi::FrameOpSuccess) {
+        if (begin_result == QRhi::FrameOpDeviceLost) {
+            throw DeviceLostError("RhiContext: device lost on beginOffscreenFrame (backend " +
+                                  backend_name().toStdString() + ")");
+        }
         throw RenderError("RhiContext: beginOffscreenFrame failed on backend " +
                           backend_name().toStdString());
     }
@@ -120,14 +125,17 @@ QImage RhiContext::render_frame(
     cb->endPass(batch);
     frame_guard.rhi = nullptr; // disarm before we end the frame ourselves
     const QRhi::FrameOpResult end_result = rhi_->endOffscreenFrame();
+    if (end_result == QRhi::FrameOpDeviceLost) {
+        throw DeviceLostError("RhiContext: device lost on endOffscreenFrame (backend " +
+                              backend_name().toStdString() + ")");
+    }
 
     if (!readback_done || readback.data.isEmpty()) {
         const bool frame_ok = end_result == QRhi::FrameOpSuccess;
         throw RenderError(
             std::string("RhiContext: texture readback produced no data on backend ") +
             backend_name().toStdString() +
-            (frame_ok ? "" : " (endOffscreenFrame reported a non-success result, "
-                             "e.g. device loss)"));
+            (frame_ok ? "" : " (endOffscreenFrame reported a non-success result)"));
     }
 
     QImage img(reinterpret_cast<const uchar*>(readback.data.constData()),

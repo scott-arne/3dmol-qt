@@ -29,6 +29,22 @@
 namespace oe3dmol {
 namespace test {
 
+TEST(RenderErrorsTest, DeviceLostErrorIsRenderError) {
+    // DeviceLostError must derive from RenderError so existing catch(RenderError)
+    // sites (e.g. Viewer callers) still catch it. The OffscreenSession catches the
+    // narrower type for recovery.
+    bool caught_as_render_error = false;
+    try {
+        throw DeviceLostError("test device loss");
+    } catch (const RenderError& e) {
+        caught_as_render_error = true;
+        EXPECT_STREQ(e.what(), "test device loss");
+    } catch (...) {
+        FAIL() << "DeviceLostError was not caught as RenderError";
+    }
+    EXPECT_TRUE(caught_as_render_error);
+}
+
 // A QGuiApplication is required for QRhi backends. Created once per process.
 class RenderEnvironment : public ::testing::Environment {
 public:
